@@ -17,5 +17,5 @@ Please **don't** open a public issue for security problems. Use GitHub's private
 a week.
 
 ## Scope
-In scope: this app's code (download verification, file handling, command construction, DNS hosts handling, plugin installation).
+In scope: this app's code (download verification, file handling, command construction, DNS resolver configuration, plugin installation).
 Out of scope: vulnerabilities in Minecraft server software, Java, Android itself or Modrinth plugins. Report those to the respective projects.

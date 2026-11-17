@@ -18,9 +18,9 @@ import java.net.URL
 import java.security.MessageDigest
 
 /** CPU architectures LapisServe knows how to fetch runtimes for. */
-enum class Arch(val adoptium: String, val alpine: String, val muslLoader: String) {
-    ARM64("aarch64", "aarch64", "ld-musl-aarch64.so.1"),
-    X64("x64", "x86_64", "ld-musl-x86_64.so.1");
+enum class Arch(val adoptium: String, val alpine: String, val muslLoader: String, val jdk8: String) {
+    ARM64("aarch64", "aarch64", "ld-musl-aarch64.so.1", "aarch64"),
+    X64("x64", "x86_64", "ld-musl-x86_64.so.1", "amd64");
 
     companion object {
         val current: Arch? by lazy {
@@ -32,7 +32,7 @@ enum class Arch(val adoptium: String, val alpine: String, val muslLoader: String
 }
 
 object Http {
-    private const val UA = "bladestech/LapisServe/0.3.1 (+https://github.com/bladestech/LapisServe)"
+    private const val UA = "bladestech/LapisServe/0.4.0 (+https://github.com/bladestech/LapisServe)"
 
     private fun open(url: String): HttpURLConnection {
         var u = url
@@ -147,3 +147,15 @@ fun Long.humanBytes(): String {
 
 fun Int.humanMb(): String =
     if (this >= 1024) "%.1f GB".format(this / 1024.0).replace(".0 GB", " GB") else "$this MB"
+
+/** Compares Minecraft version strings: "1.8.8" < "1.20.3" < "1.21" < "26.1"; a pre-release sorts just below its release. */
+object McVersion {
+    fun key(v: String): Long {
+        val base = v.trim().substringBefore('-').substringBefore(' ')
+        val p = base.split('.').map { it.toIntOrNull() ?: 0 }
+        val pre = if ('-' in v) 0 else 1
+        return ((p.getOrElse(0) { 0 } * 1000L + p.getOrElse(1) { 0 }) * 1000L + p.getOrElse(2) { 0 }) * 10 + pre
+    }
+
+    fun atLeast(v: String, min: String) = key(v) >= key(min)
+}

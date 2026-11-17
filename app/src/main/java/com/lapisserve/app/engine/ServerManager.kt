@@ -12,6 +12,7 @@ import com.lapisserve.app.core.sizeRecursive
 import com.lapisserve.app.model.*
 import com.lapisserve.app.providers.Providers
 import com.lapisserve.app.runtime.JavaRuntime
+import com.lapisserve.app.core.McVersion
 import com.lapisserve.app.service.ServerService
 import com.lapisserve.app.system.SystemInfo
 import kotlinx.coroutines.*
@@ -251,7 +252,7 @@ class ServerManager(private val app: Context) {
             val art = Providers.resolve(c.type, c.version)
             needJavaMajor = art.javaMajor
             if (c.type.isJava) {
-                java.ensure(c.javaMajorOverride.takeIf { it > 0 } ?: art.javaMajor) { setProgress(c.id, it) }
+                java.ensure(JavaRuntime.runtimeFor(c.javaMajorOverride.takeIf { it > 0 } ?: art.javaMajor)) { setProgress(c.id, it) }
             }
             val target = File(d, art.fileName)
             Http.download(art.url, target, art.sha256, art.sha1, art.md5) { done, total ->
@@ -262,13 +263,26 @@ class ServerManager(private val app: Context) {
             File(d, ".java-major").writeText(needJavaMajor.toString())
             c = c.copy(installedVersion = c.version, jarFile = art.fileName); update(c)
         } else if (c.type.isJava) {
-            val major = c.javaMajorOverride.takeIf { it > 0 } ?: File(d, ".java-major").readTextOrNull()?.trim()?.toIntOrNull() ?: 21
+            val major = javaFor(c, d)
             if (!java.isInstalled(major)) java.ensure(major) { setProgress(c.id, it) }
+        }
+        // Minecraft 1.7-1.16.5 (vanilla) need Mojang's replacement logging config to be safe from Log4Shell.
+        Log4jFix.configFor(c.type, c.version)?.let { cfg ->
+            val f = File(d, cfg.fileName)
+            if (!f.exists()) {
+                setProgress(c.id, Progress("Downloading Log4Shell fix", null, cfg.fileName))
+                Http.download(cfg.url, f, sha1 = cfg.sha1)
+            }
         }
         setProgress(c.id, null)
     }
 
     private fun File.readTextOrNull() = runCatching { readText() }.getOrNull()
+
+    /** The installed Java this server runs on: the user's choice, or what its Minecraft version asks for. */
+    private fun javaFor(c: ServerConfig, d: File): Int = JavaRuntime.runtimeFor(
+        c.javaMajorOverride.takeIf { it > 0 } ?: File(d, ".java-major").readTextOrNull()?.trim()?.toIntOrNull() ?: 21,
+    )
     private fun setProgress(id: String, p: Progress?) = setState(id) { it.copy(progress = p) }
 
     private suspend fun runServer(id: String) {
@@ -285,10 +299,10 @@ class ServerManager(private val app: Context) {
             }
             c = config(id) ?: return
             File(d, "tmp").mkdirs()
-            val hostsFile = File(d, "lapis-hosts")
             if (c.type.isJava) {
-                val (n, failed) = DnsHosts.write(hostsFile, c.extraHosts)
-                log(id, "DNS: resolved $n hostnames for the Java runtime." + if (failed.isNotEmpty()) " Could not resolve: ${failed.joinToString()}" else "", LogLine.Kind.SYSTEM)
+                File(d, "lapis-hosts").delete()   // left over from the old pre-resolved hosts approach
+                val ns = DnsConfig.write(app, d)
+                log(id, "DNS: ${ns.joinToString(", ")}", LogLine.Kind.SYSTEM)
             }
             if (c.type.isJava) {
                 LaunchBuilder.writeJavaConfig(c, d)
@@ -311,10 +325,13 @@ class ServerManager(private val app: Context) {
             var javaEnv: Map<String, String> = emptyMap()
             cmd += LaunchBuilder.schedulingPrefix(c, plan)
             if (c.type.isJava) {
-                val major = c.javaMajorOverride.takeIf { it > 0 } ?: File(d, ".java-major").readTextOrNull()?.trim()?.toIntOrNull() ?: 21
-                cmd += java.commandPrefix(major)
+                val major = javaFor(c, d)
+                cmd += java.commandPrefix(major, d)
+                if (!java.dnsPatched) log(id, "DNS: could not set up name lookups for this Java runtime; online mode and plugin downloads may fail.", LogLine.Kind.WARN)
+                if (!java.acceptPatched) log(id, "Network: could not apply the accept() fix; players connecting may stop servers that use Java's built-in networking.", LogLine.Kind.WARN)
                 javaEnv = java.environment(major)
-                cmd += LaunchBuilder.jvmArgs(c, cores, File(d, "tmp"), hostsFile, major, plan)
+                log(id, "Java $major (${if (JavaRuntime.fromAlpine(major)) "OpenJDK from Alpine" else "Eclipse Temurin"})", LogLine.Kind.SYSTEM)
+                cmd += LaunchBuilder.jvmArgs(c, cores, File(d, "tmp"), major, plan)
                 cmd += listOf("-jar", c.jarFile, "nogui")
             } else { cmd += File(d, c.jarFile).path; javaEnv = LaunchBuilder.nativeEnv(plan) }
             if (c.extraServerArgs.isNotBlank()) cmd += LaunchBuilder.splitArgs(c.extraServerArgs)
@@ -345,7 +362,8 @@ class ServerManager(private val app: Context) {
             } else null
             val metrics = scope.launch { metricsLoop(id, l, pid, allowed) }
             val vitals = scope.launch { vitalsLoop(id, l, allowed) }
-            val dnsRefresh = if (c.type.isJava) scope.launch { while (isActive) { delay(5 * 60_000L); runCatching { DnsHosts.write(hostsFile, config(id)?.extraHosts ?: "") } } } else null
+            // Follow network changes (Wi-Fi to mobile data and back); the JVM re-reads the file on every lookup.
+            val dnsRefresh = if (c.type.isJava) scope.launch { while (isActive) { delay(15_000L); runCatching { DnsConfig.write(app, d) } } } else null
             val readyRegex = if (c.type.isJava) Regex("""Done \(.*\)! For help""") else Regex("""(?i)(done|started|listening|ready)""")
             val fallbackReady = if (!c.type.isJava) scope.launch { delay(20_000); markRunning(id) } else null
             withContext(Dispatchers.IO) {
@@ -447,11 +465,15 @@ class ServerManager(private val app: Context) {
                 setState(id) { it.copy(playersOnline = r.online, playersMax = r.max, pingMs = r.latencyMs, versionSeen = r.versionName, players = set.toList().sorted()) }
             }
             // Ask the server for tick health. Its reply is swallowed from the console but parsed above.
-            val cmd = when { c.type.supportsPlugins -> "tps"; c.type == ServerType.VANILLA -> "tick query"; else -> null }
+            val cmd = when {
+                c.type.supportsPlugins -> "tps"
+                c.type == ServerType.VANILLA && McVersion.atLeast(c.version, "1.20.3") -> "tick query"   // added in 1.20.3
+                else -> null
+            }
             if (cmd != null) {
                 pollWindow[id] = System.currentTimeMillis() + 2500
                 withContext(Dispatchers.IO) { runCatching { l.stdin.write(cmd + "\n"); l.stdin.flush() } }
-                if (c.type.supportsPlugins && tick % 2 == 0) {
+                if (c.type.supportsPlugins && tick % 2 == 0 && McVersion.atLeast(c.version, "1.16")) {
                     delay(300)
                     pollWindow[id] = System.currentTimeMillis() + 2500
                     withContext(Dispatchers.IO) { runCatching { l.stdin.write("mspt\n"); l.stdin.flush() } }

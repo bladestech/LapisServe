@@ -19,7 +19,9 @@ app, directly from:
 | Paper server | PaperMC (`fill.papermc.io`) |
 | Purpur server | PurpurMC (`api.purpurmc.org`) |
 | Pumpkin server | `github.com/Pumpkin-MC/Pumpkin` releases (GPL-3.0) |
-| Java runtime | Eclipse Temurin via Adoptium (`api.adoptium.net`) |
+| Java runtime (21, 25) | Eclipse Temurin via Adoptium (`api.adoptium.net`) |
+| Java runtime (8, 11, 17) | OpenJDK packages from the Alpine Linux package repository |
+| Log4Shell fix configs for old vanilla versions | Mojang (`launcher.mojang.com`) |
 | C runtime (musl, libgcc, libstdc++, zlib) | Alpine Linux package repository |
 | Plugins | Modrinth (`api.modrinth.com`), subject to each plugin's own license |
 | Paper and Pumpkin logos | Each project's official GitHub repository, cached on the device |

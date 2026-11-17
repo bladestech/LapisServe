@@ -2,6 +2,27 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.4.0] - 2026-11-17
+
+### Added
+- **Old Minecraft versions work.** Each server now gets the Java its Minecraft version needs, downloaded on first use: Java 8 for 1.16.5
+  and older, 17 for 1.17 – 1.20.4, 21 for 1.20.5 – 1.21.x and 25 for 26.x. Java 8, 11 and 17 are OpenJDK from Alpine Linux's official
+  repository. Tested with Vanilla 1.8.9, Paper 1.12.2 and Vanilla 1.17.1.
+- **Log4Shell protection** for Vanilla 1.7 – 1.18, applied automatically as in Mojang's advisory.
+
+### Changed
+- **Real DNS.** Java servers now use your phone's own DNS servers (with Cloudflare and Google as fallback), so every hostname resolves:
+  plugin update checks, webhooks, databases, anything. This replaces the list of pre-resolved hostnames, and the **Extra hostnames**
+  setting is gone.
+- Java's trusted certificates come from Android's, including any you added yourself.
+- Console polling for TPS/MSPT only uses commands the server's version has.
+- The compatibility page is organised by chipset and Android version.
+
+### Fixed
+- Servers on Java's built-in networking (Minecraft 1.16 and older, among others) were killed by Android the moment anyone connected.
+- Java 8's launcher could not start on Android.
+- HTTPS failed on Alpine's Java (it looked for a crypto library Android doesn't have).
+
 ## [0.3.1] - 2026-11-17
 
 ### Added
