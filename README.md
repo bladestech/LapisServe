@@ -1,73 +1,131 @@
+<div align="center">
+
+<img src="branding/icon-512.png" width="132" alt="LapisServe logo"/>
+
+# LapisServe
+
+**Host Minecraft servers from your pocket.**
+Material 3 Expressive · per-server resource controls · nothing bundled
+
+[![Release](https://img.shields.io/github/v/release/bladestech/LapisServe?include_prereleases&label=release&color=4F8CFF)](../../releases)
+[![Build](https://github.com/bladestech/LapisServe/actions/workflows/build.yml/badge.svg)](../../actions/workflows/build.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
+
+[**Download**](../../releases/latest) · [How it works](#-how-it-works) · [Build](#-build-from-source) · [Contribute](CONTRIBUTING.md)
+
+<br/>
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/home.png" width="230" alt="Home screen with a running Paper server"/></td>
+    <td><img src="docs/screenshots/live.png" width="230" alt="Live memory and CPU meters"/></td>
+    <td><img src="docs/screenshots/plugins.png" width="230" alt="Modrinth plugin browser"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Every server at a glance</sub></td>
+    <td align="center"><sub>Live RAM and CPU vs. what you allocated</sub></td>
+    <td align="center"><sub>One-tap plugins from Modrinth</sub></td>
+  </tr>
+</table>
+
+</div>
+
+## ✨ Why LapisServe
+Your phone has a fast ARM chip, plenty of RAM and a battery that doubles as a UPS. LapisServe turns it into a Minecraft server you can manage
+from the same screen it runs on, with the knobs a real host expects and none of the setup.
+
+| | |
+| --- | --- |
+| 🧩 **Four servers** | Vanilla, Paper, Purpur and Pumpkin (experimental, written in Rust) |
+| ⬇️ **Nothing bundled** | Java, server jars, plugins and logos are downloaded from their official sources, with checksums verified |
+| 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version |
+| 📊 **Live meters** | Memory and CPU shown against what each server is allocated |
+| 🛡️ **Device tuning** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
+| 🔌 **Plugins** | Search, install and manage plugins from Modrinth, with required dependencies resolved (optional) |
+| 🖥️ **Console** | Filters, command history, copy and share logs |
+
+## 🧠 Smart about memory
+The RAM slider knows your device. It caps at **90%** of physical memory, shifts from calm blue to amber to red as you approach unsafe values, shows
+how much is in use right now, and warns you if what you ask for plus what Android is already using exceeds what's free.
+
 <p align="center">
-  <img src="branding/icon-512.png" width="120" alt="LapisServe logo"/>
+  <img src="docs/screenshots/ram.png" width="260" alt="RAM slider with comfortable, heavy and risky zones"/>
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/presets.png" width="260" alt="One-tap presets"/>
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/tuning.png" width="260" alt="Device tuning with processor model"/>
 </p>
 
-<h1 align="center">LapisServe</h1>
+## 📲 Install
+1. Download the latest APK from the [**Releases**](../../releases/latest) page. Each release includes a SHA-256 checksum.
+2. Allow installing from your browser or file manager when Android asks.
+3. Open LapisServe, tap **Device tuning**, and follow the suggestions. This is what decides whether your server survives with the screen off.
+4. Tap **New server**, pick your software and version, and press **Start**. The first launch downloads what it needs.
 
-<p align="center">
-  Host Minecraft servers on an Android phone.<br/>
-  Material 3 Expressive UI · per-server resource controls · nothing bundled.
-</p>
+> **Good to know:** you'll want an **ARM64 phone with at least 4 GB of RAM**. LapisServe isn't on the Play Store (see
+> [why `targetSdk 28`](#-how-it-works)), so you install the APK yourself.
 
-<p align="center">
-  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"/></a>
-  <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-green.svg"/>
-</p>
+<p align="center"><img src="docs/screenshots/create.png" width="260" alt="Choosing server software"/></p>
 
-LapisServe downloads everything it needs at run time from the official sources: server software, Java, plugins and logos are never stored
-in this repository or bundled in the APK.
+## 🧰 Supported software
+| Server | What it's for | Plugins |
+| --- | --- | :---: |
+| **Vanilla** | The official Mojang server, unmodified | ✗ |
+| **Paper** | High-performance fork with plugin support | ✓ |
+| **Purpur** | Paper fork with extra gameplay options | ✓ |
+| **Pumpkin** | Experimental server in Rust, tiny footprint, ARM64 only | ✗ |
 
-**Supported servers:** Vanilla (Mojang) · Paper · Purpur · Pumpkin (experimental, Rust, ARM64 only)
+## 🔧 How it works
+```mermaid
+flowchart LR
+    A[Create a server] --> B[Resolve version<br/>Mojang · PaperMC · PurpurMC · GitHub]
+    B --> C[Download jar<br/>checksum verified]
+    C --> D{Needs Java?}
+    D -- yes --> E[Temurin musl JRE<br/>Adoptium + Alpine musl runtime]
+    D -- no --> G
+    E --> F[Pre-resolve hostnames<br/>→ hosts file for the JVM]
+    F --> G[Start in a foreground service<br/>wake and Wi-Fi locks]
+    G --> H[Live console, CPU and RAM]
+```
 
-## Install
-Grab the latest APK from the [Releases](../../releases) page and install it (you'll need to allow installs from your browser or file manager).
-Releases include a SHA-256 checksum. LapisServe is not on the Play Store; see "Why `targetSdk 28`" below.
-
-You'll want a phone with an ARM64 CPU and at least 4 GB of RAM. Open **Device tuning** inside the app on first run: it checks the Android
-settings that decide whether your server survives in the background.
-
-## Features
-- **Per-server settings:** RAM (capped at 90% of device memory; the slider turns amber then red toward unsafe values and warns when current usage
-  plus your allocation exceeds free RAM), per-core pinning, scheduling priority, garbage collector, Java version, view and simulation distance,
-  network, behaviour, and one-tap presets.
-- **Live meters:** memory and CPU shown against what is allocated to each server.
-- **Device tuning:** checks developer options and battery settings, and shows your processor model and core layout.
-- **Plugins (optional):** search and install plugins from [Modrinth](https://modrinth.com) for Paper and Purpur, with required dependencies and
-  SHA-512 verification. The rest of the app works without it.
-- **Console:** filters, command history, copy and share log.
-
-## How it works
-- Server jars come from Mojang, PaperMC, PurpurMC and Pumpkin's GitHub releases, with checksums verified.
-- **Java:** Android's libc can't run stock JVMs, so LapisServe downloads Eclipse Temurin for Linux/musl from Adoptium and a small musl C runtime
-  from Alpine's package repository, then starts the JVM through the musl loader.
+- **Java on Android:** Android's libc can't run stock JVMs, so LapisServe downloads Eclipse Temurin for Linux/musl from Adoptium plus a small musl
+  C runtime from Alpine's package repository, and starts the JVM through the musl loader.
 - **DNS:** musl has no resolver configuration on Android, so the app resolves common hostnames itself and gives the JVM a hosts file
-  (`-Djdk.net.hosts.file`, Java 9+). Extra hostnames for plugins can be added per server.
-- **Pumpkin config:** Pumpkin writes a full `pumpkin.toml` on first run; LapisServe lets it do that, then patches only the keys it manages.
-- **Why `targetSdk 28`:** Android 10+ blocks executing downloaded files for apps targeting 29 or higher. This is the same trade-off Termux makes,
-  and it's why the app is distributed outside the Play Store.
+  (`-Djdk.net.hosts.file`, Java 9+). Add extra hostnames per server for plugins that call other sites.
+- **Pumpkin config:** Pumpkin writes a full `pumpkin.toml` on first run; LapisServe lets it, then patches only the keys it manages (Java and Bedrock).
+- **Why `targetSdk 28`:** Android 10+ stops apps targeting API 29 or higher from running files they downloaded. LapisServe has to run Java and
+  Pumpkin, so, like Termux, it targets 28 and is distributed outside the Play Store.
 
-## Known limitations
-- The Java runtime works on ARM64 phones. On the x86_64 emulator, musl binaries are killed by Android's seccomp filter, so the emulator can show
-  the UI but not run Java servers. Arm64 emulation on x86_64 hosts isn't supported by the Android emulator.
-- Online-mode authentication depends on the pre-resolved hostname list; unusual hosts must be added in the server's network settings.
+## ⚠️ Known limitations
+- **ARM64 only for servers.** Java servers run on real ARM64 phones. The x86_64 emulator can show the UI, but Android's seccomp filter kills musl
+  binaries there, and the Android emulator can't run arm64 images on an x86 PC.
+- Online-mode login relies on the pre-resolved hostname list; unusual hosts must be added in the server's network settings.
 - Java 8 servers (Minecraft 1.16 and older) aren't supported by the DNS workaround.
-- Pumpkin is experimental upstream and only publishes an ARM64 Android build.
+- Pumpkin is experimental upstream.
+- Tested so far on a single device (Snapdragon 8+ Gen 1, Android 15). Reports from other phones are very welcome.
 
-## Build
+## 🛠️ Build from source
 Requires JDK 17+ (21 recommended) and the Android SDK (API 36).
 
 ```bash
-./gradlew :app:assembleDebug        # debug APK in app/build/outputs/apk/debug
+./gradlew :app:assembleDebug        # APK in app/build/outputs/apk/debug
 ./gradlew :app:testDebugUnitTest    # unit tests
 ```
 
-Release signing reads `keystore.properties` (git-ignored) or the `LAPIS_KEYSTORE_*` environment variables; without them the release build falls
-back to the debug key. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Release signing reads `keystore.properties` (git-ignored) or the `LAPIS_KEYSTORE_*` environment variables. Without them, release builds fall back
+to the debug key so contributors can still build. Details in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Privacy
-LapisServe has no analytics or telemetry and no account. It only contacts the sources listed in [NOTICE.md](NOTICE.md), when you create or start a
-server, browse plugins, or when the app fetches a project logo.
+## 🔒 Privacy
+No analytics, no telemetry, no account. LapisServe only contacts the sources listed in [NOTICE.md](NOTICE.md), when you create or start a server,
+browse plugins, or the app fetches a project logo.
 
-## License and trademarks
-LapisServe is licensed under the [Apache License 2.0](LICENSE). It is an independent project and is not affiliated with or endorsed by Mojang,
-Microsoft, PaperMC, PurpurMC, the Pumpkin project or Modrinth. See [NOTICE.md](NOTICE.md) for third-party content, logos and trademarks.
+## 🤝 Contributing
+Bug reports, device reports and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see
+[SECURITY.md](SECURITY.md).
+
+## 📄 License and trademarks
+LapisServe is licensed under the [Apache License 2.0](LICENSE). It is an independent project and is **not affiliated with or endorsed by** Mojang,
+Microsoft, PaperMC, PurpurMC, the Pumpkin project or Modrinth. "Minecraft" is a trademark of Mojang Synergies AB. Third-party content, logos and
+trademarks are covered in [NOTICE.md](NOTICE.md).
