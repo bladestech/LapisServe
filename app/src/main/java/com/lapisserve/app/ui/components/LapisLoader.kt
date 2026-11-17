@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.contentDescription
@@ -164,7 +166,12 @@ fun DrawScope.drawLapisLogo(head: Float, tail: Float, tip: Boolean, flash: Float
     withTransform({
         translate((size.width - UNIT * s) / 2f, (size.height - UNIT * s) / 2f)
         scale(s, s, Offset.Zero)
-    }) {
+    }) { drawLogoUnits(head, tail, tip, flash, colors) }
+}
+
+/** The logo in artwork units (0..2560); the caller sets up the transform. */
+private fun DrawScope.drawLogoUnits(head: Float, tail: Float, tip: Boolean, flash: Float, colors: LogoColors) {
+    run {
         block(UPPER, colors.upperTop, colors.upperBottom)
         block(LOWER, colors.lowerTop, colors.lowerBottom)
         val a = tail.coerceIn(0f, 1f) * TOTAL
@@ -207,4 +214,71 @@ private fun DrawScope.bar(r: Rect, vertical: Boolean, flash: Float, c: LogoColor
     val brush = if (vertical) Brush.verticalGradient(stops, r.top, r.bottom) else Brush.horizontalGradient(stops, r.left, r.right)
     drawRoundRect(brush, r.topLeft, Size(r.width, r.height), CornerRadius(10f, 10f))
     if (flash > 0f) drawRoundRect(Color.White, r.topLeft, Size(r.width, r.height), CornerRadius(10f, 10f), alpha = 0.45f * flash)
+}
+
+// ------------------------------------------------------------------ launch splash
+
+private const val SPLASH_DRAW_END = 800f       // the S has drawn itself
+private const val SPLASH_EXT_START = 820f      // its top bar starts running to the edge
+private const val SPLASH_HIT = 1060f           // ...and hits the right side of the screen
+private const val SPLASH_WIPE_END = 1680f      // the bar has swept back across the screen
+private const val SPLASH_END = 1760f
+private val Accel: Easing = CubicBezierEasing(0.6f, 0f, 0.9f, 0.5f)
+private val WipeEase: Easing = CubicBezierEasing(0.5f, 0f, 0.2f, 1f)
+
+/**
+ * Full-screen launch splash over the app: the S draws itself, its top bar keeps going and hits the right edge of the screen,
+ * then turns into a bright bar that sweeps back across and wipes the splash away, revealing the app underneath.
+ * [onDone] is called once the screen is clear. Under reduce motion it simply shows the logo briefly.
+ */
+@Composable
+fun LapisSplash(background: Color, colors: LogoColors, modifier: Modifier = Modifier, logoSize: Dp = 148.dp, onDone: () -> Unit) {
+    val reduce = LocalAppearance.current.reduceMotion
+    val time = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        if (reduce) { time.snapTo(SPLASH_DRAW_END); kotlinx.coroutines.delay(350) }
+        else time.animateTo(SPLASH_END, tween(SPLASH_END.toInt(), easing = LinearEasing))
+        onDone()
+    }
+    Canvas(modifier.fillMaxSize().semantics { contentDescription = "LapisServe" }) {
+        val t = time.value
+        val w = size.width; val h = size.height
+        val logoPx = logoSize.toPx()
+        val ox = (w - logoPx) / 2f; val oy = h * 0.45f - logoPx / 2f; val s = logoPx / UNIT
+        val impactY = oy + TOP.center.y * s
+        val wipe = up(t, SPLASH_HIT, SPLASH_WIPE_END, WipeEase)
+        val wipeX = w * (1f - wipe)
+        // The splash layer, cut away from the right as the bar sweeps back.
+        if (wipeX > 0f) clipRect(right = wipeX) {
+            drawRect(background)
+            withTransform({ translate(ox, oy); scale(s, s, Offset.Zero) }) {
+                val flash = if (t >= SPLASH_HIT) 1f - up(t, SPLASH_HIT, SPLASH_HIT + 300f, LinearEasing) else 0f
+                drawLogoUnits(up(t, 0f, SPLASH_DRAW_END), 0f, tip = t < SPLASH_EXT_START, flash = flash, colors = colors)
+                val ext = up(t, SPLASH_EXT_START, SPLASH_HIT, Accel)
+                if (ext > 0f && t < SPLASH_HIT + 120f) {
+                    val edge = (w - ox) / s + 40f
+                    val x1 = TOP.right + (edge - TOP.right) * ext
+                    bar(Rect(TOP.right - 10f, TOP.top + 22f, x1, TOP.bottom - 22f), vertical = false, flash = 0f, c = colors)
+                    val tipAt = Offset(x1, TOP.center.y)
+                    drawCircle(Brush.radialGradient(listOf(colors.glow.copy(alpha = 0.9f), colors.glow.copy(alpha = 0f)), tipAt, 260f), 260f, tipAt)
+                }
+            }
+        }
+        if (t >= SPLASH_HIT) {
+            // The sweeping bar.
+            val half = 26.dp.toPx()
+            val fade = 1f - up(t, SPLASH_HIT + 450f, SPLASH_WIPE_END + 60f, LinearEasing)
+            if (fade > 0f) drawRect(
+                Brush.horizontalGradient(listOf(colors.barEdge.copy(alpha = 0f), colors.barMid, colors.barEdge.copy(alpha = 0f)), wipeX - half, wipeX + half),
+                Offset(wipeX - half, 0f), Size(half * 2f, h), alpha = fade,
+            )
+            // Spark where the line hit the edge.
+            val sp = 1f - up(t, SPLASH_HIT, SPLASH_HIT + 350f, LinearEasing)
+            if (sp > 0f) {
+                val r = 70.dp.toPx() * (1.4f - sp)
+                val at = Offset(w, impactY)
+                drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.9f * sp), colors.barMid.copy(alpha = 0f)), at, r), r, at)
+            }
+        }
+    }
 }
