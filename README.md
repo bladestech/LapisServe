@@ -13,7 +13,7 @@ Material 3 Expressive · per-server resource controls · nothing bundled
 ![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
 
-[**Download**](../../releases/latest) · [How it works](#-how-it-works) · [Build](#-build-from-source) · [Contribute](CONTRIBUTING.md)
+[**Download**](../../releases/latest) · [Compatibility](docs/COMPATIBILITY.md) · [How it works](#-how-it-works) · [Build](#-build-from-source) · [Contribute](CONTRIBUTING.md)
 
 <br/>
 
@@ -104,7 +104,7 @@ flowchart LR
 - Online-mode login relies on the pre-resolved hostname list; unusual hosts must be added in the server's network settings.
 - Java 8 servers (Minecraft 1.16 and older) aren't supported by the DNS workaround.
 - Pumpkin is experimental upstream.
-- Tested so far on a single device (Snapdragon 8+ Gen 1, Android 15). Reports from other phones are very welcome.
+- Tested so far on a single device (Snapdragon 8+ Gen 1, Android 15). See the [compatibility page](docs/COMPATIBILITY.md) and send a [device report](../../issues/new?template=device_report.yml).
 
 ## 🛠️ Build from source
 Requires JDK 17+ (21 recommended) and the Android SDK (API 36).

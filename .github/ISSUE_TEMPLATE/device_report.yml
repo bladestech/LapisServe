@@ -1,0 +1,54 @@
+name: Device report
+description: Tell us whether LapisServe works on your phone
+title: "[Device] "
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Working reports are as useful as failures. See the [compatibility page](../blob/main/docs/COMPATIBILITY.md).
+  - type: input
+    id: device
+    attributes:
+      label: Phone model
+      placeholder: "e.g. Pixel 8, Galaxy S23"
+    validations: { required: true }
+  - type: input
+    id: chipset
+    attributes:
+      label: Chipset and RAM
+      description: Shown on the app's Device tuning screen.
+      placeholder: "e.g. Snapdragon 8+ Gen 1, 7 GB"
+    validations: { required: true }
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      placeholder: "e.g. 15"
+    validations: { required: true }
+  - type: input
+    id: app
+    attributes:
+      label: LapisServe version
+      placeholder: "e.g. 0.1.0"
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: What did you try, and did it reach the server's ready message?
+      options:
+        - label: Vanilla worked
+        - label: Paper worked
+        - label: Purpur worked
+        - label: Pumpkin worked
+        - label: A Minecraft client joined successfully
+        - label: Ran for 30+ minutes without being killed
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and problems
+  - type: textarea
+    id: log
+    attributes:
+      label: Console log if something failed
+      description: Console tab, Share log. Remove anything private.
+      render: text
