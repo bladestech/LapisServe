@@ -17,7 +17,7 @@ stability or a verified player join unless the notes say so.
 ## Tested devices
 | Device | Chipset | Android | App | Vanilla | Paper | Purpur | Pumpkin | Tested |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| OnePlus CPH2415 | Snapdragon 8+ Gen 1 (SM8475), 8 cores, 7 GB RAM | 15 | 0.1.0, 0.2.0, 0.2.1 | 🟡 | ✅ | ✅ | ✅ | 2026-11 |
+| OnePlus CPH2415 | Snapdragon 8+ Gen 1 (SM8475), 8 cores, 7 GB RAM | 15 | 0.1.0 – 0.3.0 | 🟡 | ✅ | ✅ | ✅ | 2026-11 |
 
 ### Notes
 - **OnePlus CPH2415:** the author's phone and the only device tested so far.
@@ -25,6 +25,9 @@ stability or a verified player join unless the notes say so.
   - **Pumpkin 0.2.2:** starts, and settings written to `pumpkin.toml` are applied (Java and Bedrock sections).
   - **Vanilla:** reported by the author as working for the most part; not exhaustively verified, hence 🟡.
   - Java servers needed the app's DNS workaround (a pre-resolved hosts file) because Android has no `/etc/resolv.conf` for the JVM.
+  - **0.3.0 core pinning:** works without root (cores 1 prime + 3 performance + 4 efficiency). Tick focus measured ~2.3× lower tick time
+    than unpinned under load. Android periodically resets affinity and parks the prime core when warm; the app handles both.
+  - **CPU boost hints:** not available; this phone's power HAL reports no performance-hint support.
 
 ## Known not to work
 | Environment | Why |

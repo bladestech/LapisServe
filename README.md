@@ -45,10 +45,11 @@ from the same screen it runs on, with the knobs a real host expects and none of 
 | 👥 **Players** | See who is online; kick, op, ban and whitelist in a tap |
 | 🔔 **Activity feed and alerts** | Starts, stops, crashes and joins in one timeline; a notification if a server stops unexpectedly |
 | 💾 **Backups** | One-tap world, whitelist, ops and ban backups with a safe restore |
-| 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version, one-tap presets |
+| 🚀 **Tuned for phones** | The game loop gets the fastest core to itself (~2.3× faster ticks than unpinned in our test), CPU boost hints where supported, JVM and Paper/Spigot/Bukkit tuning |
+| 🪄 **Simple by default** | Pick a goal and a player count and go; everything technical is handled. Flip to **Advanced** for cores, GC, Java version, JVM flags and more |
 | 🛡️ **Device checkup** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
 | 🔌 **Plugins** | Search Modrinth and install any version (release, beta or alpha) with required dependencies resolved (optional) |
-| 🎨 **Make it yours** | Glass UI with an animated backdrop, six accent colours, light, dark and AMOLED themes, wallpaper colours, reduce-motion |
+| 🎨 **Make it yours** | Clean Material 3 Expressive design, six accent colours, light, dark and AMOLED themes, wallpaper colours, reduce-motion |
 
 ## 🧠 Smart about memory
 The RAM slider knows your device. It caps at **90%** of physical memory, shifts from calm blue to amber to red as you approach unsafe values, shows
@@ -98,6 +99,8 @@ flowchart LR
 - **DNS:** musl has no resolver configuration on Android, so the app resolves common hostnames itself and gives the JVM a hosts file
   (`-Djdk.net.hosts.file`, Java 9+). Add extra hostnames per server for plugins that call other sites.
 - **Pumpkin config:** Pumpkin writes a full `pumpkin.toml` on first run; LapisServe lets it, then patches only the keys it manages (Java and Bedrock).
+- **Cores:** per-core capacity from `/sys` decides the plan. The JVM is started under `taskset`, then each thread's affinity is checked and re-applied
+  (Android resets it), with the busiest `Server thread` pinned to the fastest core. No root is needed: an app may set the affinity of its own processes.
 - **Why `targetSdk 28`:** Android 10+ stops apps targeting API 29 or higher from running files they downloaded. LapisServe has to run Java and
   Pumpkin, so, like Termux, it targets 28 and is distributed outside the Play Store.
 
