@@ -26,8 +26,8 @@ android {
         // directory for apps targeting >= 29. LapisServe downloads its runtimes (Java, Pumpkin)
         // at run time, so it must be able to execute them. Same trade-off Termux makes.
         targetSdk = 28
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -72,8 +72,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("org.apache.commons:commons-compress:1.28.0")
+    implementation("dev.chrisbanes.haze:haze:1.6.10")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")   // real org.json for JVM tests (Android only ships stubs)
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
 }

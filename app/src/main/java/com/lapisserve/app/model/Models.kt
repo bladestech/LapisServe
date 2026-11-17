@@ -98,6 +98,26 @@ data class ServerRuntime(
     val uptimeSec: Long = 0,
     val pid: Long = 0,
     val message: String? = null,
+    // ---- live vitals (see engine/Metrics.kt)
+    val tps: Float? = null,                // current TPS (1 minute average where the server reports it)
+    val tps5m: Float? = null,
+    val tps15m: Float? = null,
+    val mspt: Float? = null,               // milliseconds per tick, when reported
+    val playersOnline: Int = 0,
+    val playersMax: Int = 0,
+    val players: List<String> = emptyList(),
+    val pingMs: Int = -1,                  // local server-list-ping latency
+    val versionSeen: String = "",
+    val worldBytes: Long = 0,
+    val tpsHistory: List<Float> = emptyList(),
+    val cpuHistory: List<Float> = emptyList(),   // fraction of allocated CPU, 0..1
+    val ramHistory: List<Float> = emptyList(),   // fraction of allocated RAM, 0..1
+    val playerHistory: List<Float> = emptyList(),
 )
+
+/** Something worth telling the owner about, shown in the Activity feed. */
+data class ServerEvent(val id: Long, val time: Long, val serverId: String, val serverName: String, val kind: Kind, val text: String) {
+    enum class Kind { STARTED, STOPPED, CRASHED, JOIN, LEAVE, WARNING, INFO }
+}
 
 data class VersionEntry(val id: String, val channel: String = "release")

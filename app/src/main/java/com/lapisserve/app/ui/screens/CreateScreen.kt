@@ -52,15 +52,21 @@ fun CreateScreen(manager: ServerManager, onBack: () -> Unit, onCreated: (String)
     if (type == ServerType.PUMPKIN && ram > 2048) LaunchedEffect(type) { ram = 1024 }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = { TopAppBar(title = { Text("New server") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } }) },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        topBar = {
+            TopAppBar(
+                title = { Text("New server") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            )
+        },
         bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+            Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Button(
                     onClick = { onCreated(manager.create(type, version!!, name, ram.coerceAtMost(mem.maxAllocMb)).id) },
                     enabled = version != null && supported,
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).height(56.dp),
-                ) { Icon(Icons.Rounded.RocketLaunch, null); Spacer(Modifier.width(10.dp)); Text("Create server") }
+                    modifier = Modifier.fillMaxWidth().height(58.dp),
+                ) { Icon(Icons.Rounded.RocketLaunch, null); Spacer(Modifier.width(10.dp)); Text("Create server", style = MaterialTheme.typography.titleMedium) }
             }
         },
     ) { pad ->
@@ -68,11 +74,11 @@ fun CreateScreen(manager: ServerManager, onBack: () -> Unit, onCreated: (String)
             Text("1 · Choose software", style = MaterialTheme.typography.titleMedium)
             ServerType.entries.forEach { t ->
                 val sel = t == type
-                ElevatedCard(
-                    onClick = { type = t }, shape = MaterialTheme.shapes.large,
-                    colors = CardDefaults.elevatedCardColors(containerColor = if (sel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow),
+                com.lapisserve.app.ui.glass.GlassCard(
+                    Modifier.fillMaxWidth(), onClick = { type = t }, shape = MaterialTheme.shapes.large,
+                    tint = if (sel) MaterialTheme.colorScheme.primary else null, padding = PaddingValues(16.dp),
                 ) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         TypeAvatar(t, 52.dp)
                         Column(Modifier.weight(1f)) {
                             Text(t.label, style = MaterialTheme.typography.titleMedium)
