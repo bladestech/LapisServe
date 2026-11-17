@@ -47,7 +47,7 @@ from the same screen it runs on, with the knobs a real host expects and none of 
 | 💾 **Backups** | One-tap world, whitelist, ops and ban backups with a safe restore |
 | 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version, one-tap presets |
 | 🛡️ **Device checkup** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
-| 🔌 **Plugins** | Search, install and manage plugins from Modrinth, with required dependencies resolved (optional) |
+| 🔌 **Plugins** | Search Modrinth and install any version (release, beta or alpha) with required dependencies resolved (optional) |
 | 🎨 **Make it yours** | Glass UI with an animated backdrop, six accent colours, light, dark and AMOLED themes, wallpaper colours, reduce-motion |
 
 ## 🧠 Smart about memory

@@ -14,6 +14,15 @@ data class MrProject(
 data class MrVersion(
     val id: String, val projectId: String, val number: String,
     val fileName: String, val url: String, val sha512: String?, val requiredDeps: List<String>,
+    val name: String = number, val channel: Channel = Channel.RELEASE, val published: String = "",
+    val downloads: Long = 0, val changelog: String = "", val gameVersions: List<String> = emptyList(), val sizeBytes: Long = 0,
+) {
+    enum class Channel(val label: String) { RELEASE("Release"), BETA("Beta"), ALPHA("Alpha") }
+}
+
+data class MrProjectInfo(
+    val title: String, val description: String, val downloads: Long, val followers: Long,
+    val categories: List<String>, val iconUrl: String?, val sourceUrl: String?, val issuesUrl: String?, val pageUrl: String, val license: String?,
 )
 
 /** Minimal client for the public Modrinth API (v2). Only reads; no account or token needed. */
@@ -60,10 +69,29 @@ object Modrinth {
         return parseVersion(v)
     }
 
+    /** Every version compatible with this server, newest first, including betas and alphas. */
+    suspend fun versions(projectId: String, mcVersion: String, loaders: List<String>): List<MrVersion> {
+        val url = "$API/project/$projectId/version?loaders=${enc(JSONArray(loaders).toString())}" +
+            "&game_versions=${enc(JSONArray(listOf(gameVersion(mcVersion))).toString())}"
+        val arr = Http.jsonArray(url)
+        return (0 until arr.length()).mapNotNull { parseVersion(arr.getJSONObject(it)) }
+    }
+
+    suspend fun projectInfo(projectId: String): MrProjectInfo? = runCatching {
+        val p = Http.json("$API/project/$projectId")
+        fun list(k: String) = p.optJSONArray(k)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+        MrProjectInfo(
+            title = p.getString("title"), description = p.optString("description"), downloads = p.optLong("downloads"), followers = p.optLong("followers"),
+            categories = list("categories").filter { it !in setOf("bukkit", "spigot", "paper", "purpur", "folia", "bungeecord", "velocity", "waterfall") },
+            iconUrl = p.optString("icon_url").ifEmpty { null }, sourceUrl = p.optString("source_url").ifEmpty { null }, issuesUrl = p.optString("issues_url").ifEmpty { null },
+            pageUrl = "https://modrinth.com/plugin/${p.optString("slug", projectId)}", license = p.optJSONObject("license")?.optString("id")?.ifEmpty { null },
+        )
+    }.getOrNull()
+
     suspend fun projectTitle(projectId: String): String =
         runCatching { Http.json("$API/project/$projectId").getString("title") }.getOrDefault(projectId)
 
-    private fun parseVersion(v: JSONObject): MrVersion? {
+    internal fun parseVersion(v: JSONObject): MrVersion? {
         val files = v.getJSONArray("files")
         val list = (0 until files.length()).map { files.getJSONObject(it) }
         val f = list.firstOrNull { it.optBoolean("primary") } ?: list.firstOrNull { it.getString("filename").endsWith(".jar") } ?: return null
@@ -75,6 +103,10 @@ object Modrinth {
             id = v.getString("id"), projectId = v.getString("project_id"), number = v.optString("version_number"),
             fileName = f.getString("filename"), url = f.getString("url"),
             sha512 = f.optJSONObject("hashes")?.optString("sha512")?.ifEmpty { null }, requiredDeps = required,
+            name = v.optString("name").ifBlank { v.optString("version_number") },
+            channel = when (v.optString("version_type")) { "beta" -> MrVersion.Channel.BETA; "alpha" -> MrVersion.Channel.ALPHA; else -> MrVersion.Channel.RELEASE },
+            published = v.optString("date_published"), downloads = v.optLong("downloads"), changelog = v.optString("changelog"),
+            gameVersions = v.optJSONArray("game_versions")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty(), sizeBytes = f.optLong("size"),
         )
     }
 }

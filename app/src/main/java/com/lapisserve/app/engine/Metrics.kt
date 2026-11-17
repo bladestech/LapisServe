@@ -87,6 +87,14 @@ object Slp {
     }
 }
 
+/**
+ * Reads a process's output line by line. When the process is killed (force stop, stop timeout) Android closes the stream under
+ * the blocked reader and throws an IOException; that is simply the end of the output, never a reason to crash the app.
+ */
+fun forEachLineSafely(stream: java.io.InputStream, onLine: (String) -> Unit) {
+    try { stream.bufferedReader().forEachLine(onLine) } catch (_: java.io.IOException) { /* stream closed by destroy(): treat as EOF */ }
+}
+
 /** Pure parsers for the text servers print. Kept separate so they are easy to unit test. */
 object ConsoleParsers {
     private val ansi = Regex("\u001B\\[[0-9;]*[A-Za-z]")

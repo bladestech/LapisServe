@@ -2,6 +2,27 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Restart and Force-stop (kill) buttons** beside Start/Stop on a server's Overview. Force stop asks first and explains the risk; it is also
+  available while a server is stuck in "Stopping".
+- **Plugin detail page.** Tap a plugin (in Browse or Installed) for its description, license, links and every compatible version, grouped into
+  Release, Beta and Alpha with dates, downloads, sizes and changelogs. Install any version; betas and alphas ask for confirmation. Installed
+  plugins show "Tap for versions" so you can switch or downgrade.
+- **Animations.** A living halo around the server icon (ripples while starting, a breathing ring when running, collapsing ripples while stopping,
+  a one-time burst when it becomes ready, red after a crash). The Start/Stop button morphs colour, icon and label; the status pill animates its
+  label; server cards reorder smoothly; the "New server" button collapses as you scroll; "Stopping" shows progress.
+
+### Fixed
+- **Force stop crashed the app.** Killing a server closed its output pipe while it was being read, and the resulting exception was not caught.
+  This affected "Force stop" in the menu and the stop-timeout fallback in 0.1.x and 0.2.0.
+- **Force stop left the server shown as Running** with 0 MB of RAM and kept its wake locks. The state, event log and wake locks are now cleaned up
+  when the process exits.
+
+### Tests
+- 47 unit tests (version parsing for Modrinth channels, and a regression test for the closed-pipe crash).
+
 ## [0.2.0] - 2026-11-17
 
 ### Added

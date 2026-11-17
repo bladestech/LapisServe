@@ -214,7 +214,19 @@ class ServerManager(private val app: Context) {
         }
     }
 
-    fun forceStop(id: String) { live[id]?.let { it.stopRequested = true; it.process.destroyForcibly() }; jobs[id]?.cancel() }
+    /**
+     * Kills the process immediately. While a process is alive the run coroutine is deliberately NOT cancelled: it is the one
+     * that notices the exit, resets the state, posts the event and releases the wake locks. Only with no process
+     * (still installing) is the job cancelled.
+     */
+    fun forceStop(id: String) {
+        val l = live[id]
+        if (l != null) {
+            l.stopRequested = true
+            setState(id) { it.copy(state = RunState.STOPPING, message = null) }
+            l.process.destroyForcibly()
+        } else { jobs[id]?.cancel(); setState(id) { ServerRuntime() } }
+    }
     fun stopAll() = _servers.value.forEach { if (isActive(it.id)) stop(it.id) }
 
     fun sendCommand(id: String, cmd: String) {
@@ -315,7 +327,7 @@ class ServerManager(private val app: Context) {
             val readyRegex = if (c.type.isJava) Regex("""Done \(.*\)! For help""") else Regex("""(?i)(done|started|listening|ready)""")
             val fallbackReady = if (!c.type.isJava) scope.launch { delay(20_000); markRunning(id) } else null
             withContext(Dispatchers.IO) {
-                proc.inputStream.bufferedReader().forEachLine { line ->
+                forEachLineSafely(proc.inputStream) { line ->
                     val ours = System.currentTimeMillis() < (pollWindow[id] ?: 0L) && ConsoleParsers.isPollingOutput(line)
                     if (!ours) log(id, line, classify(line))
                     if (readyRegex.containsMatchIn(line)) markRunning(id)

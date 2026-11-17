@@ -36,6 +36,9 @@ class PluginStore(private val dir: File) {
             }
     }
 
+    /** Version number currently installed for a project, if it came from Modrinth. */
+    fun installedVersionNumber(projectId: String): String? = meta().optJSONObject(projectId)?.optString("number")?.ifEmpty { null }
+
     fun installedProjectIds(): Map<String, String> {
         val m = meta(); val out = HashMap<String, String>()
         m.keys().forEach { out[it] = m.getJSONObject(it).optString("versionId") }
@@ -58,12 +61,12 @@ class PluginStore(private val dir: File) {
      */
     suspend fun install(
         projectId: String, title: String?, mcVersion: String, loaders: List<String>,
-        status: (String) -> Unit = {}, depth: Int = 0,
+        status: (String) -> Unit = {}, depth: Int = 0, version: MrVersion? = null,
     ): List<String> {
         require(depth <= 3) { "Dependency chain too deep" }
         val name = title ?: Modrinth.projectTitle(projectId)
         status("Finding $name")
-        val v = Modrinth.latestVersion(projectId, mcVersion, loaders)
+        val v = version ?: Modrinth.latestVersion(projectId, mcVersion, loaders)
             ?: error("$name has no version for Minecraft ${Modrinth.gameVersion(mcVersion)}")
         val done = ArrayList<String>()
         val have = installedProjectIds()
@@ -78,7 +81,7 @@ class PluginStore(private val dir: File) {
         m.optJSONObject(projectId)?.optString("file")?.takeIf { it.isNotEmpty() && it != v.fileName }?.let {
             File(dir, it).delete(); File(dir, "$it.disabled").delete()
         }
-        m.put(projectId, JSONObject().put("file", v.fileName).put("versionId", v.id).put("title", name))
+        m.put(projectId, JSONObject().put("file", v.fileName).put("versionId", v.id).put("title", name).put("number", v.number))
         saveMeta(m)
         done += name
         return done
