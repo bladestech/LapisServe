@@ -96,8 +96,8 @@ fun CreateScreen(manager: ServerManager, onBack: () -> Unit, onCreated: (String)
                 !supported -> InfoBanner("Pumpkin only publishes an Android build for ARM64. This device reports ${Arch.current?.name ?: "an unsupported CPU"}.", Icons.Rounded.Block, BannerKind.ERROR)
                 error != null -> InfoBanner(error!!, Icons.Rounded.CloudOff, BannerKind.ERROR, title = "Couldn't load versions")
                 versions == null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { LoadingIndicator(Modifier.size(40.dp)); Text("Fetching versions…") }
-                else -> OutlinedCard(onClick = { picker = true }, shape = MaterialTheme.shapes.medium) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                else -> com.lapisserve.app.ui.glass.GlassCard(Modifier.fillMaxWidth(), onClick = { picker = true }, shape = MaterialTheme.shapes.medium, padding = PaddingValues(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("${type.label} version", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(version ?: "Choose…", style = MaterialTheme.typography.titleLarge)

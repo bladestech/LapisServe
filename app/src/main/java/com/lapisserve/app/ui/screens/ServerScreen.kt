@@ -98,7 +98,7 @@ fun ServerScreen(manager: ServerManager, id: String, startTab: String, onBack: (
                 },
             ) { t ->
                 when (t) {
-                    "Overview" -> OverviewTab(manager, cfg, rt, active, toggle, notify, onSettings = { tab = "Settings" }, onTuning = onTuning)
+                    "Overview" -> OverviewTab(manager, cfg, rt, active, toggle, notify, onSettings = { tab = "Settings" }, onTuning = onTuning, onPlayers = { tab = "Players" })
                     "Console" -> Box(Modifier.padding(bottom = if (imeVisible) 0.dp else BottomBarSpace - 14.dp)) { ConsoleTab(manager, cfg, rt, notify) }
                     "Players" -> PlayersTab(manager, cfg, rt, notify)
                     "Plugins" -> PluginsTab(manager, cfg, active, notify)
@@ -142,7 +142,7 @@ private fun typeTint(type: ServerType): androidx.compose.ui.graphics.Color = whe
 @Composable
 private fun OverviewTab(
     manager: ServerManager, cfg: ServerConfig, rt: ServerRuntime, active: Boolean, onToggle: () -> Unit,
-    notify: (String) -> Unit, onSettings: () -> Unit, onTuning: () -> Unit,
+    notify: (String) -> Unit, onSettings: () -> Unit, onTuning: () -> Unit, onPlayers: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val clip = LocalClipboardManager.current
@@ -220,60 +220,52 @@ private fun OverviewTab(
             // ---- insights first: what needs attention
             if (running) items(insights, key = { it.title }) { i -> InsightCard(i, Modifier.staggerIn(n++)) { a -> if (a == InsightAction.OPEN_SETTINGS) onSettings() else onTuning() } }
 
-            // ---- vitals grid
+            // ---- vitals: compact pills, two per row
             item {
-                Row(Modifier.fillMaxWidth().staggerIn(n++), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    val tps = rt.tps
+                val tps = rt.tps
+                val ramFrac = if (cfg.ramMb > 0) rt.rssMb.toFloat() / cfg.ramMb else 0f
+                val cpuFrac = (rt.cpuCoresUsed / cores).coerceIn(0f, 1f)
+                val maxSlots = rt.playersMax.takeIf { it > 0 } ?: cfg.maxPlayers
+                val pills = buildList {
                     if (cfg.type == ServerType.PUMPKIN || (running && tps == null && rt.uptimeSec > 25))
-                        VitalTile("TPS", Icons.Rounded.Speed, "—", Modifier.weight(1f).fillMaxHeight(), sub = if (cfg.type == ServerType.PUMPKIN) "Not reported by Pumpkin" else "Waiting for the server…")
-                    else GaugeTile("TPS", Icons.Rounded.Speed, ((tps ?: 0f) / 20f), tps?.let { "%.1f".format(it) } ?: "…", Modifier.weight(1f).fillMaxHeight(),
-                        color = tpsColor(tps), sub = "of 20", footer = rt.tps5m?.let { "5m %.1f · 15m %.1f".format(it, rt.tps15m ?: it) } ?: "ticks per second")
-                    VitalTile("Players", Icons.Rounded.Group, "${rt.playersOnline} / ${rt.playersMax.takeIf { it > 0 } ?: cfg.maxPlayers}", Modifier.weight(1f).fillMaxHeight(),
-                        sub = if (rt.players.isEmpty()) "No one online" else rt.players.joinToString(", "),
-                        spark = rt.playerHistory, sparkColor = cs.tertiary, sparkMin = 0f)
+                        add(Pill(Icons.Rounded.Speed, "—", if (cfg.type == ServerType.PUMPKIN) "TPS · not reported" else "TPS · waiting", cs.outline))
+                    else add(Pill(Icons.Rounded.Speed, tps?.let { "%.1f".format(it) } ?: "…", "TPS", tpsColor(tps), ring = (tps ?: 0f) / 20f))
+                    add(Pill(Icons.Rounded.Group, "${rt.playersOnline} / $maxSlots", "Players", cs.tertiary, onClick = onPlayers))
+                    add(Pill(Icons.Rounded.Memory, "${(ramFrac * 100).toInt()}%", "RAM ${rt.rssMb.humanMb()}", if (ramFrac > .9f) cs.error else cs.primary, ring = ramFrac))
+                    add(Pill(Icons.Rounded.DeveloperBoard, "${(cpuFrac * 100).toInt()}%", "CPU · %.1f of $cores".format(rt.cpuCoresUsed), if (cpuFrac > .9f) cs.error else cs.tertiary, ring = cpuFrac))
+                    add(Pill(Icons.Rounded.Timer, rt.mspt?.let { "%.1f ms".format(it) } ?: "—", "Tick time",
+                        rt.mspt?.let { if (it >= 45f) cs.error else if (it >= 35f) st.warn else st.good } ?: cs.outline))
+                    add(Pill(Icons.Rounded.NetworkPing, if (rt.pingMs >= 0) "${rt.pingMs} ms" else "—", "Latency", cs.primary))
+                    add(Pill(Icons.Rounded.Schedule, formatUptime(rt.uptimeSec), "Uptime", cs.secondary))
+                    add(Pill(Icons.Rounded.Public, rt.worldBytes.humanBytes(), "World size", cs.secondary))
                 }
-            }
-            item {
-                Row(Modifier.fillMaxWidth().staggerIn(n++), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    val ramFrac = if (cfg.ramMb > 0) rt.rssMb.toFloat() / cfg.ramMb else 0f
-                    GaugeTile("Memory", Icons.Rounded.Memory, ramFrac, "${(ramFrac * 100).toInt()}%", Modifier.weight(1f).fillMaxHeight(),
-                        color = if (ramFrac > .9f) cs.error else cs.primary, sub = "of ${cfg.ramMb.humanMb()}", footer = "${rt.rssMb.humanMb()} in use")
-                    val cpuFrac = (rt.cpuCoresUsed / cores).coerceIn(0f, 1f)
-                    GaugeTile("CPU", Icons.Rounded.DeveloperBoard, cpuFrac, "${(cpuFrac * 100).toInt()}%", Modifier.weight(1f).fillMaxHeight(),
-                        color = if (cpuFrac > .9f) cs.error else cs.tertiary, sub = "of $cores core${if (cores == 1) "" else "s"}", footer = "%.1f cores busy".format(rt.cpuCoresUsed))
-                }
-            }
-            item {
-                Row(Modifier.fillMaxWidth().staggerIn(n++), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    VitalTile("Tick time", Icons.Rounded.Timer, rt.mspt?.let { "%.1f ms".format(it) } ?: "—", Modifier.weight(1f).fillMaxHeight(),
-                        valueColor = rt.mspt?.let { if (it >= 45f) cs.error else if (it >= 35f) st.warn else st.good } ?: cs.onSurface,
-                        sub = if (rt.mspt != null) "of the 50 ms budget" else "Not reported yet")
-                    VitalTile("Latency", Icons.Rounded.NetworkPing, if (rt.pingMs >= 0) "${rt.pingMs} ms" else "—", Modifier.weight(1f).fillMaxHeight(),
-                        sub = rt.versionSeen.ifEmpty { "Local status ping" })
-                }
-            }
-            item {
-                Row(Modifier.fillMaxWidth().staggerIn(n++), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    VitalTile("Uptime", Icons.Rounded.Schedule, formatUptime(rt.uptimeSec), Modifier.weight(1f).fillMaxHeight(), sub = "since it started")
-                    VitalTile("World", Icons.Rounded.Public, rt.worldBytes.humanBytes(), Modifier.weight(1f).fillMaxHeight(), sub = "on this phone")
+                Column(Modifier.staggerIn(n++), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    pills.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            row.forEach { PillStat(it, Modifier.weight(1f)) }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
                 }
             }
 
             // ---- history chart
             item {
                 GlassCard(Modifier.staggerIn(n++), shape = MaterialTheme.shapes.large) {
-                    val options = buildList { if (cfg.type != ServerType.PUMPKIN) add("TPS"); add("CPU"); add("Memory"); add("Players") }
+                    val options = buildList { if (cfg.type != ServerType.PUMPKIN) add("TPS"); add("CPU"); add("RAM"); add("Players") }
                     val sel = options[chart.coerceIn(0, options.lastIndex)]
                     Text("Last 6 minutes", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(10.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        options.forEachIndexed { i, o -> FilterChip(i == chart.coerceIn(0, options.lastIndex), { chart = i }, { Text(o) }) }
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        options.forEachIndexed { i, o ->
+                            SegmentedButton(i == chart.coerceIn(0, options.lastIndex), { chart = i }, SegmentedButtonDefaults.itemShape(i, options.size)) { Text(o, maxLines = 1) }
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                     val (series, color, lo, hi) = when (sel) {
                         "TPS" -> Quad(rt.tpsHistory, tpsColor(rt.tps), 0f, 20f)
                         "CPU" -> Quad(rt.cpuHistory, cs.tertiary, 0f, 1f)
-                        "Memory" -> Quad(rt.ramHistory, cs.primary, 0f, 1f)
+                        "RAM" -> Quad(rt.ramHistory, cs.primary, 0f, 1f)
                         else -> Quad(rt.playerHistory, cs.secondary, 0f, null)
                     }
                     AnimatedContent(sel, label = "chart") { _ -> Sparkline(series, color, Modifier.fillMaxWidth().height(130.dp), minValue = lo, maxValue = hi) }

@@ -104,3 +104,30 @@ fun InsightCard(insight: Insight, modifier: Modifier = Modifier, onAction: (Insi
         }
     }
 }
+
+
+/** One compact stat: an icon (optionally wrapped in a level ring), a value and a short label. */
+data class Pill(
+    val icon: ImageVector, val value: String, val label: String, val color: Color,
+    val ring: Float? = null, val onClick: (() -> Unit)? = null,
+)
+
+@Composable
+fun PillStat(pill: Pill, modifier: Modifier = Modifier) {
+    GlassCard(
+        modifier.height(66.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(50), onClick = pill.onClick,
+        padding = PaddingValues(horizontal = 11.dp, vertical = 0.dp),
+    ) {
+        Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (pill.ring != null) RingGauge(pill.ring, pill.color, Modifier.size(44.dp), stroke = 4.dp) {
+                Icon(pill.icon, null, Modifier.size(18.dp), tint = pill.color)
+            } else Box(Modifier.size(44.dp).clip(CircleShape).background(pill.color.copy(alpha = .16f)), Alignment.Center) {
+                Icon(pill.icon, null, Modifier.size(20.dp), tint = pill.color)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(pill.value, style = MaterialTheme.typography.titleMedium, color = pill.color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(pill.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}

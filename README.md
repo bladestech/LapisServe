@@ -19,14 +19,14 @@ Material 3 Expressive · per-server resource controls · nothing bundled
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/home.png" width="230" alt="Home screen with a running Paper server"/></td>
-    <td><img src="docs/screenshots/live.png" width="230" alt="Live memory and CPU meters"/></td>
-    <td><img src="docs/screenshots/plugins.png" width="230" alt="Modrinth plugin browser"/></td>
+    <td><img src="docs/screenshots/home.png" width="230" alt="Servers screen with a running Paper server"/></td>
+    <td><img src="docs/screenshots/hero.png" width="230" alt="Server dashboard with TPS gauge and health insight"/></td>
+    <td><img src="docs/screenshots/vitals.png" width="230" alt="Live vitals: memory, CPU, tick time, latency"/></td>
   </tr>
   <tr>
     <td align="center"><sub>Every server at a glance</sub></td>
-    <td align="center"><sub>Live RAM and CPU vs. what you allocated</sub></td>
-    <td align="center"><sub>One-tap plugins from Modrinth</sub></td>
+    <td align="center"><sub>TPS, players and plain-language health advice</sub></td>
+    <td align="center"><sub>Live memory, CPU, tick time and latency</sub></td>
   </tr>
 </table>
 
@@ -40,22 +40,26 @@ from the same screen it runs on, with the knobs a real host expects and none of 
 | --- | --- |
 | 🧩 **Four servers** | Vanilla, Paper, Purpur and Pumpkin (experimental, written in Rust) |
 | ⬇️ **Nothing bundled** | Java, server jars, plugins and logos are downloaded from their official sources, with checksums verified |
-| 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version |
-| 📊 **Live meters** | Memory and CPU shown against what each server is allocated |
+| 📊 **Everything an owner watches** | **TPS** and tick time, players online and latency, memory and CPU against what's allocated, uptime, world size, 6-minute history charts |
+| 💡 **Plain-language health advice** | "The server is lagging, lower the view distance from 8 to 6", "the phone is running hot", "battery is low" |
+| 👥 **Players** | See who is online; kick, op, ban and whitelist in a tap |
+| 🔔 **Activity feed and alerts** | Starts, stops, crashes and joins in one timeline; a notification if a server stops unexpectedly |
+| 💾 **Backups** | One-tap world, whitelist, ops and ban backups with a safe restore |
+| 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version, one-tap presets |
 | 🛡️ **Device tuning** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
 | 🔌 **Plugins** | Search, install and manage plugins from Modrinth, with required dependencies resolved (optional) |
-| 🖥️ **Console** | Filters, command history, copy and share logs |
+| 🎨 **Make it yours** | Glass UI with an animated backdrop, six accent colours, light, dark and AMOLED themes, wallpaper colours, reduce-motion |
 
 ## 🧠 Smart about memory
 The RAM slider knows your device. It caps at **90%** of physical memory, shifts from calm blue to amber to red as you approach unsafe values, shows
 how much is in use right now, and warns you if what you ask for plus what Android is already using exceeds what's free.
 
 <p align="center">
-  <img src="docs/screenshots/ram.png" width="260" alt="RAM slider with comfortable, heavy and risky zones"/>
+  <img src="docs/screenshots/activity.png" width="260" alt="Activity feed"/>
   &nbsp;&nbsp;
-  <img src="docs/screenshots/presets.png" width="260" alt="One-tap presets"/>
+  <img src="docs/screenshots/device.png" width="260" alt="Device screen with processor model and hosting readiness"/>
   &nbsp;&nbsp;
-  <img src="docs/screenshots/tuning.png" width="260" alt="Device tuning with processor model"/>
+  <img src="docs/screenshots/themes.png" width="260" alt="Theme and accent colour settings"/>
 </p>
 
 ## 📲 Install
@@ -67,7 +71,6 @@ how much is in use right now, and warns you if what you ask for plus what Androi
 > **Good to know:** you'll want an **ARM64 phone with at least 4 GB of RAM**. LapisServe isn't on the Play Store (see
 > [why `targetSdk 28`](#-how-it-works)), so you install the APK yourself.
 
-<p align="center"><img src="docs/screenshots/create.png" width="260" alt="Choosing server software"/></p>
 
 ## 🧰 Supported software
 | Server | What it's for | Plugins |
