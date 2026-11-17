@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.lapisserve.app.core.Arch
 import com.lapisserve.app.core.humanMb
+import com.lapisserve.app.engine.CoreTopology
 import com.lapisserve.app.engine.LaunchBuilder
 import com.lapisserve.app.engine.ServerManager
 import com.lapisserve.app.model.*
@@ -150,6 +151,8 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
     val mem by remember { SystemInfo.memoryFlow(ctx) }.collectAsState(initial = SystemInfo.memory(ctx))
     val cores = remember { Runtime.getRuntime().availableProcessors() }
     val freqs = remember { SystemInfo.coreMaxFreqs() }
+    val scores = remember { SystemInfo.coreScores() }
+    val adv = com.lapisserve.app.ui.theme.LocalAppearance.current.advanced
     fun set(c: ServerConfig) = manager.update(c)
     var versionPicker by remember { mutableStateOf(false) }
     var versions by remember { mutableStateOf<List<VersionEntry>?>(null) }
@@ -160,7 +163,7 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
     val offsets = remember { mutableStateMapOf<String, Int>() }
     fun Modifier.anchor(k: String) = this.onGloballyPositioned { offsets[k] = it.positionInParent().y.toInt() }
     val sections = buildList {
-        add("Presets"); add("Memory"); add("Processor"); if (cfg.type.isJava) add("Java")
+        add("Presets"); add("Memory"); add(if (adv) "Processor" else "Performance"); if (adv && cfg.type.isJava) add("Java")
         add("Gameplay"); add("Network"); add("Behaviour"); add("Backups"); add("Version")
     }
     Column(Modifier.fillMaxSize()) {
@@ -192,22 +195,58 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
 
         SettingsCard("Memory", Icons.Rounded.Memory, Modifier.anchor("Memory"), subtitle = "Heap given to ${cfg.type.label}") {
             RamSlider(cfg.ramMb, { set(cfg.copy(ramMb = it)) }, mem)
-            if (cfg.type.isJava) SwitchRow("Pre-allocate memory", "Reserves the whole heap at launch. Smoother gameplay, but Android sees the memory as used immediately.", cfg.preTouch, { set(cfg.copy(preTouch = it)) })
+            if (adv && cfg.type.isJava) SwitchRow("Pre-allocate memory", "Reserves the whole heap at launch. Smoother gameplay, but Android sees the memory as used immediately.", cfg.preTouch, { set(cfg.copy(preTouch = it)) })
         }
 
-        SettingsCard("Processor", Icons.Rounded.DeveloperBoard, Modifier.anchor("Processor"), subtitle = "${remember { SystemInfo.processorName() }} · $cores cores") {
-            Text("Tap cores to choose where the server may run. Pinning to performance cores speeds up ticks; efficiency cores save battery and heat.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            CoreSelector(cores, cfg.cpuMask, freqs) { set(cfg.copy(cpuMask = it)) }
-            val eff = LaunchBuilder.effectiveCores(cfg, cores)
-            Text(if (cfg.cpuMask == 0) "Using all $cores cores." else "Pinned to $eff of $cores cores.", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        if (!adv) SettingsCard("Performance", Icons.Rounded.Speed, Modifier.anchor("Performance"), subtitle = "Tuned automatically for ${remember { SystemInfo.processorName() }}") {
+            val plan = CoreTopology.plan(cfg, scores)
+            val lines = buildList {
+                add(when {
+                    plan.dedicatedTick && cfg.type.isJava -> "Game loop gets the fastest core to itself; everything else runs on ${CoreTopology.describe(plan.restMask, cores)}."
+                    plan.mask != 0 -> "Runs on the ${plan.activeCores} fastest cores (${CoreTopology.describe(plan.mask, cores)})."
+                    else -> "Uses all $cores cores."
+                })
+                if (cfg.autoTune) add(if (cfg.type.isJava) "Java and server configs tuned for phones." else "Chunk compression and worker threads tuned for phones.")
+                if (cfg.autoTune && com.lapisserve.app.engine.TickBoost.supported()) add("Asks Android for CPU boosts when the server is busy, where the phone supports it.")
+            }
+            lines.forEach { l ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Rounded.CheckCircle, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(l, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            Text("Want to change cores, Java or garbage collection? Switch to Advanced in the app's Settings.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        if (adv) SettingsCard("Processor", Icons.Rounded.DeveloperBoard, Modifier.anchor("Processor"), subtitle = "${remember { SystemInfo.processorName() }} · $cores cores") {
+            val strategy = if (cfg.coreStrategy == CoreStrategy.AUTO && cfg.cpuMask != 0) CoreStrategy.MANUAL else cfg.coreStrategy
+            ChoiceRow("Core layout", CoreStrategy.entries, strategy, { it.label }, { s ->
+                set(cfg.copy(coreStrategy = s, cpuMask = if (s == CoreStrategy.MANUAL) (cfg.cpuMask.takeIf { it != 0 } ?: CoreTopology.performanceMask(scores)) else 0))
+            }, desc = strategy.blurb)
+            val plan = CoreTopology.plan(cfg, scores)
+            if (strategy == CoreStrategy.MANUAL) {
+                Text("Tap cores to choose where the server may run.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CoreSelector(cores, cfg.cpuMask, freqs, { set(cfg.copy(cpuMask = it, coreStrategy = CoreStrategy.MANUAL)) }, scores)
+            }
+            val summary = when {
+                plan.dedicatedTick -> "${plan.strategy.label}: tick thread on core ${plan.tickCore}, other threads on ${CoreTopology.describe(plan.restMask, cores)}."
+                plan.mask != 0 -> "${plan.strategy.label}: ${plan.activeCores} of $cores cores (${CoreTopology.describe(plan.mask, cores)})."
+                else -> "${plan.strategy.label}: using all $cores cores."
+            }
+            Text(summary, Modifier.animateContentSize(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            if (!cfg.type.isJava) SwitchRow("Performance tuning", "Faster chunk compression and worker threads sized to the cores Pumpkin may use.", cfg.autoTune, { set(cfg.copy(autoTune = it)) })
+            if (plan.mask != 0) Text("Performance cores run hotter. If the phone throttles on long sessions, try All cores.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ChoiceRow("Scheduling priority", CpuPriority.entries, cfg.cpuPriority, { it.label }, { set(cfg.copy(cpuPriority = it)) },
                 desc = "Gentle and Background let the phone stay responsive for other apps. Android doesn't allow raising priority above Normal without root.")
         }
 
-        if (cfg.type.isJava) SettingsCard("Java", Icons.Rounded.Coffee, Modifier.anchor("Java"), subtitle = "Runtime and garbage collector") {
+        if (adv && cfg.type.isJava) SettingsCard("Java", Icons.Rounded.Coffee, Modifier.anchor("Java"), subtitle = "Runtime and garbage collector") {
             ChoiceRow("Garbage collector", GcPreset.entries, cfg.gc, { it.label }, { set(cfg.copy(gc = it)) }, desc = cfg.gc.blurb)
             ChoiceRow("Java version", listOf(0, 8, 17, 21, 25), cfg.javaMajorOverride, { if (it == 0) "Auto" else "Java $it" }, { set(cfg.copy(javaMajorOverride = it)) },
                 desc = "Auto uses what Mojang recommends for ${cfg.version}. Downloaded from Adoptium on first use.")
+            SwitchRow("Performance tuning", if (cfg.type.supportsPlugins)
+                "Tunes the JVM and Paper/Spigot/Bukkit configs for phones: entity activation ranges, item merging, spawn limits, faster redstone (Alternate Current) and fewer JIT threads. Turn off to edit those files yourself."
+                else "Tunes the JVM and server.properties for phones (fewer JIT threads, smaller entity broadcast range).", cfg.autoTune, { set(cfg.copy(autoTune = it)) })
             TextRow("Extra JVM arguments", cfg.extraJvmArgs, { set(cfg.copy(extraJvmArgs = it)) }, desc = "Advanced. Example: -XX:+UseStringDeduplication")
         }
 
@@ -227,7 +266,7 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
                 SwitchRow("Generate structures", "Villages, temples and so on. Applies to new chunks.", cfg.generateStructures, { set(cfg.copy(generateStructures = it)) })
                 SwitchRow("Allow flight", "Stops survival players being kicked for flying with mods.", cfg.allowFlight, { set(cfg.copy(allowFlight = it)) })
                 SwitchRow("Command blocks", null, cfg.commandBlocks, { set(cfg.copy(commandBlocks = it)) })
-                SliderRow("Spawn protection", cfg.spawnProtection, 0..64, { set(cfg.copy(spawnProtection = it)) }, { "$it blocks" })
+                if (adv) SliderRow("Spawn protection", cfg.spawnProtection, 0..64, { set(cfg.copy(spawnProtection = it)) }, { "$it blocks" })
                 TextRow("World seed", cfg.levelSeed, { set(cfg.copy(levelSeed = it)) }, desc = "Only used when the world is first generated.")
             }
         }
@@ -235,18 +274,18 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
         SettingsCard("Network & access", Icons.Rounded.Lan, Modifier.anchor("Network")) {
             TextRow("Port", cfg.port.toString(), { it.toIntOrNull()?.takeIf { p -> p in 1024..65535 }?.let { p -> set(cfg.copy(port = p)) } }, numeric = true, desc = "Default 25565. Must be unique per running server.")
             SwitchRow("Online mode", "Verify players with Mojang accounts. Requires working DNS inside the runtime; turn off for LAN play or cracked clients.", cfg.onlineMode, { set(cfg.copy(onlineMode = it)) })
-            if (cfg.type.isJava) TextRow("Extra hostnames", cfg.extraHosts, { set(cfg.copy(extraHosts = it)) }, singleLine = false,
+            if (adv && cfg.type.isJava) TextRow("Extra hostnames", cfg.extraHosts, { set(cfg.copy(extraHosts = it)) }, singleLine = false,
                 desc = "The Java runtime has no system DNS, so LapisServe pre-resolves Mojang, Paper and common plugin hosts. Add any other site your plugins call, separated by spaces.")
             SwitchRow("Whitelist", "Only listed players may join.", cfg.whitelist, { set(cfg.copy(whitelist = it)) })
-            if (cfg.type.isJava) SliderRow("Compression threshold", cfg.networkCompression, 0..1024, { set(cfg.copy(networkCompression = it)) }, { if (it == 0) "Always" else "$it bytes" }, step = 64,
+            if (adv && cfg.type.isJava) SliderRow("Compression threshold", cfg.networkCompression, 0..1024, { set(cfg.copy(networkCompression = it)) }, { if (it == 0) "Always" else "$it bytes" }, step = 64,
                 desc = "Higher uses less CPU, more bandwidth. Raise it on a LAN.")
         }
 
         SettingsCard("Behaviour", Icons.Rounded.Bolt, Modifier.anchor("Behaviour")) {
             SwitchRow("Restart after crash", "Up to 3 automatic restarts.", cfg.autoRestartOnCrash, { set(cfg.copy(autoRestartOnCrash = it)) })
-            SwitchRow("Keep CPU awake", "Holds a wake lock while running so the server keeps ticking with the screen off.", cfg.keepCpuAwake, { set(cfg.copy(keepCpuAwake = it)) })
-            SwitchRow("Keep Wi-Fi awake", "Prevents Wi-Fi power saving from adding lag.", cfg.keepWifiAwake, { set(cfg.copy(keepWifiAwake = it)) })
-            SliderRow("Graceful stop timeout", cfg.stopTimeoutSec, 5..120, { set(cfg.copy(stopTimeoutSec = it)) }, { "${it}s" }, step = 5, desc = "How long to wait for the world to save before force-killing.")
+            if (adv) SwitchRow("Keep CPU awake", "Holds a wake lock while running so the server keeps ticking with the screen off.", cfg.keepCpuAwake, { set(cfg.copy(keepCpuAwake = it)) })
+            if (adv) SwitchRow("Keep Wi-Fi awake", "Prevents Wi-Fi power saving from adding lag.", cfg.keepWifiAwake, { set(cfg.copy(keepWifiAwake = it)) })
+            if (adv) SliderRow("Graceful stop timeout", cfg.stopTimeoutSec, 5..120, { set(cfg.copy(stopTimeoutSec = it)) }, { "${it}s" }, step = 5, desc = "How long to wait for the world to save before force-killing.")
             if (cfg.type.isJava) SwitchRow("Minecraft EULA accepted", "Required to start a Java server.", cfg.acceptEula, { set(cfg.copy(acceptEula = it)) })
         }
 
@@ -258,7 +297,7 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
                 versionPicker = true
                 if (versions == null) scope.launch { versions = runCatching { Providers.versions(cfg.type) }.getOrNull() }
             }, enabled = !active) { Icon(Icons.Rounded.SwapVert, null); Spacer(Modifier.width(8.dp)); Text("Change version") }
-            TextRow("Extra server arguments", cfg.extraServerArgs, { set(cfg.copy(extraServerArgs = it)) }, desc = "Appended to the launch command.")
+            if (adv) TextRow("Extra server arguments", cfg.extraServerArgs, { set(cfg.copy(extraServerArgs = it)) }, desc = "Appended to the launch command.")
         }
         Spacer(Modifier.height(128.dp))
     }

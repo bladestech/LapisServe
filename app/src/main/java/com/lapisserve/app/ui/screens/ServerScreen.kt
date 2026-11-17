@@ -343,7 +343,7 @@ private fun OverviewTab(
         item {
             SettingsCard("Resources", Icons.Rounded.Tune, Modifier.staggerIn(n++)) {
                 val total = Runtime.getRuntime().availableProcessors()
-                val eff = LaunchBuilder.effectiveCores(cfg, total)
+                val eff = LaunchBuilder.effectiveCores(cfg, total, remember { com.lapisserve.app.system.SystemInfo.coreScores() })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Stat(Icons.Rounded.Memory, "${cfg.ramMb.humanMb()} RAM"); Stat(Icons.Rounded.DeveloperBoard, "$eff of $total cores")
                     if (cfg.type.isJava) Stat(Icons.Rounded.CleaningServices, LaunchBuilder.resolveGc(cfg, eff).label)

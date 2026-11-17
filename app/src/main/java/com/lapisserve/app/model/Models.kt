@@ -21,12 +21,21 @@ enum class GcPreset(val label: String, val blurb: String) {
     G1_DEFAULT("G1 · Default", "JVM default. Solid all-rounder."),
     PARALLEL("Parallel", "Higher throughput, longer pauses. Fine on small heaps."),
     SERIAL("Serial", "Lowest overhead. Best for 1 GB or less, or 1-2 cores."),
+    ZGC("ZGC · Experimental", "Collects in the background with sub-millisecond pauses, so GC never stalls a tick. Uses more memory and CPU; Java 21+, 3 GB+ heaps."),
 }
 
 enum class CpuPriority(val label: String, val nice: Int) {
     NORMAL("Normal", 0),
     GENTLE("Gentle", 5),
     BACKGROUND("Background", 10),
+}
+
+enum class CoreStrategy(val label: String, val blurb: String) {
+    AUTO("Automatic", "Picks the best layout for this phone and server type."),
+    FOCUS("Tick focus", "Performance cores only, with the fastest core kept for the main tick thread."),
+    PERFORMANCE("Performance cores", "Keeps the server off the efficiency cores."),
+    ALL("All cores", "Lets Android place threads anywhere. Coolest and most battery-friendly."),
+    MANUAL("Manual", "Choose the cores yourself."),
 }
 
 @Serializable
@@ -38,7 +47,10 @@ data class ServerConfig(
     val createdAt: Long = System.currentTimeMillis(),
     // ---- resources
     val ramMb: Int = 1024,
-    val cpuMask: Int = 0,               // bitmask of pinned cores, 0 = no pinning
+    val cpuMask: Int = 0,               // bitmask of pinned cores, 0 = no pinning (used by CoreStrategy.MANUAL)
+    val coreStrategy: CoreStrategy = CoreStrategy.AUTO,
+    /** Apply LapisServe's performance tuning to server.properties, paper, spigot and bukkit configs. */
+    val autoTune: Boolean = true,
     val cpuPriority: CpuPriority = CpuPriority.NORMAL,
     val gc: GcPreset = GcPreset.AUTO,
     val preTouch: Boolean = false,

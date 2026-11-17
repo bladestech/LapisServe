@@ -80,6 +80,18 @@ class LaunchBuilderTest {
         assertTrue(File(tmp.root, "pumpkin.toml").readText().contains("seed = \"999\""))
     }
 
+    @Test fun pumpkinPatch_tuningLowersCompressionLevelOnlyWhenOn() {
+        val toml = "[networking.java.compression]\nenabled = true\nthreshold = 256\nlevel = 4\n\n[networking.bedrock.compression]\nlevel = 4\n\n[other]\nlevel = 4\n"
+        val f = File(tmp.root, "pumpkin.toml")
+        f.writeText(toml)
+        LaunchBuilder.patchPumpkinConfig(cfg(ServerType.PUMPKIN), tmp.root)
+        assertEquals(2, Regex("level = 1").findAll(f.readText()).count())
+        assertTrue(f.readText().contains("[other]\nlevel = 4"))
+        f.writeText(toml)
+        LaunchBuilder.patchPumpkinConfig(cfg(ServerType.PUMPKIN) { copy(autoTune = false) }, tmp.root)
+        assertFalse(f.readText().contains("level = 1"))
+    }
+
     @Test fun jvmArgs_heapCoresAndHostsFile() {
         val hosts = File(tmp.root, "lapis-hosts")
         val args = LaunchBuilder.jvmArgs(cfg { copy(ramMb = 2048) }, totalCores = 8, tmpDir = tmp.root, hostsFile = hosts, javaMajor = 21)

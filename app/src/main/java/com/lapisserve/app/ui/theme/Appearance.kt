@@ -29,6 +29,8 @@ data class Appearance(
     val dynamicColor: Boolean = false,
     val reduceMotion: Boolean = false,
     val animatedBackdrop: Boolean = true,
+    /** Show every server setting. Off (Simple mode) hides what LapisServe tunes automatically. */
+    val advanced: Boolean = false,
 )
 
 /** Small persisted app preferences, exposed as a flow so the UI recomposes on change. */
@@ -43,13 +45,15 @@ class AppPrefs(context: Context) {
         dynamicColor = sp.getBoolean("dynamic", false),
         reduceMotion = sp.getBoolean("reduceMotion", false),
         animatedBackdrop = sp.getBoolean("backdrop", true),
+        advanced = sp.getBoolean("advanced", false),
     )
 
     fun update(f: (Appearance) -> Appearance) {
         val a = f(_appearance.value)
         _appearance.value = a
         sp.edit().putString("mode", a.mode.name).putString("accent", a.accent.name).putBoolean("dynamic", a.dynamicColor)
-            .putBoolean("reduceMotion", a.reduceMotion).putBoolean("backdrop", a.animatedBackdrop).apply()
+            .putBoolean("reduceMotion", a.reduceMotion).putBoolean("backdrop", a.animatedBackdrop)
+            .putBoolean("advanced", a.advanced).apply()
     }
 }
 

@@ -52,7 +52,22 @@ fun AppSettingsScreen(prefs: AppPrefs) {
         item { ScreenHeader("Settings", "Make it yours", Modifier.statusBarsPadding().staggerIn(0)) }
 
         item {
-            SettingsCard("Theme", Icons.Rounded.Palette, Modifier.staggerIn(1), subtitle = "Light, dark or true black") {
+            SettingsCard("Mode", Icons.Rounded.Tune, Modifier.staggerIn(1), subtitle = if (a.advanced) "Advanced: every setting visible" else "Simple: LapisServe handles the tuning") {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    listOf(false to "Simple", true to "Advanced").forEachIndexed { i, (adv, label) ->
+                        SegmentedButton(a.advanced == adv, { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); prefs.update { it.copy(advanced = adv) } },
+                            SegmentedButtonDefaults.itemShape(i, 2), icon = { Icon(if (adv) Icons.Rounded.Tune else Icons.Rounded.AutoAwesome, null, Modifier.size(18.dp)) }) { Text(label) }
+                    }
+                }
+                Text(
+                    if (a.advanced) "Shows core layout, garbage collector, Java version, JVM arguments, DNS hosts, network tuning and other expert options for every server."
+                    else "Cores, Java, memory tuning and server performance settings are chosen automatically for your phone. Switch to Advanced to change them; your changes are kept if you switch back.",
+                    style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            SettingsCard("Theme", Icons.Rounded.Palette, Modifier.staggerIn(2), subtitle = "Light, dark or true black") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ThemeMode.entries.forEach { m ->
                         FilterChip(a.mode == m, { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); prefs.update { it.copy(mode = m) } }, { Text(m.label) },
@@ -62,7 +77,7 @@ fun AppSettingsScreen(prefs: AppPrefs) {
             }
         }
         item {
-            SettingsCard("Accent colour", Icons.Rounded.ColorLens, Modifier.staggerIn(2), subtitle = if (a.dynamicColor) "Using your wallpaper colours" else a.accent.label) {
+            SettingsCard("Accent colour", Icons.Rounded.ColorLens, Modifier.staggerIn(3), subtitle = if (a.dynamicColor) "Using your wallpaper colours" else a.accent.label) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Accent.entries.forEach { ac -> Swatch(ac.seed, selected = !a.dynamicColor && a.accent == ac, enabled = !a.dynamicColor) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); prefs.update { it.copy(accent = ac) } } }
                 }
@@ -70,13 +85,13 @@ fun AppSettingsScreen(prefs: AppPrefs) {
             }
         }
         item {
-            SettingsCard("Motion", Icons.Rounded.Animation, Modifier.staggerIn(3)) {
+            SettingsCard("Motion", Icons.Rounded.Animation, Modifier.staggerIn(4)) {
                 SwitchRow("Animated background", "The slowly drifting colour glow behind everything.", a.animatedBackdrop, { v -> prefs.update { it.copy(animatedBackdrop = v) } })
                 SwitchRow("Reduce motion", "Turns off entrance effects and pulsing for a calmer, lighter UI.", a.reduceMotion, { v -> prefs.update { it.copy(reduceMotion = v) } })
             }
         }
         item {
-            SettingsCard("About", Icons.Rounded.Info, Modifier.staggerIn(4), subtitle = "LapisServe $version") {
+            SettingsCard("About", Icons.Rounded.Info, Modifier.staggerIn(5), subtitle = "LapisServe $version") {
                 Text("Open source under the Apache License 2.0. Independent project, not affiliated with Mojang, Microsoft, PaperMC, PurpurMC, the Pumpkin project or Modrinth.",
                     style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

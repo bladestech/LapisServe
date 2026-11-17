@@ -137,6 +137,18 @@ object SystemInfo {
             .entries.joinToString(" + ") { (khz, n) -> "${n}x %.1f GHz".format(khz / 1_000_000.0) }
     }
 
+    /**
+     * Relative speed of each core for planning: the kernel's cpu_capacity (which accounts for
+     * micro-architecture, not just clock) when every core exposes it, otherwise max frequency.
+     */
+    fun coreScores(): List<Long?> {
+        val n = Runtime.getRuntime().availableProcessors()
+        val caps = (0 until n).map { i ->
+            runCatching { File("/sys/devices/system/cpu/cpu$i/cpu_capacity").readText().trim().toLong() }.getOrNull()
+        }
+        return if (caps.all { it != null && it > 0 }) caps else coreMaxFreqs()
+    }
+
     /** Per-core max frequency (kHz) if readable; used to label efficiency vs performance cores. */
     fun coreMaxFreqs(): List<Long?> {
         val n = Runtime.getRuntime().availableProcessors()

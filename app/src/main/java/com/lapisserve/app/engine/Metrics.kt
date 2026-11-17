@@ -97,7 +97,11 @@ fun forEachLineSafely(stream: java.io.InputStream, onLine: (String) -> Unit) {
 
 /** Pure parsers for the text servers print. Kept separate so they are easy to unit test. */
 object ConsoleParsers {
-    private val ansi = Regex("\u001B\\[[0-9;]*[A-Za-z]")
+    private val ansi = Regex("\u001B\\[[0-9;?]*[ -/]*[@-~]")
+
+    /** Removes terminal colour/style escape codes (Pumpkin and some plugins colour their output). */
+    fun stripAnsi(s: String): String = if ('\u001B' in s) s.replace(ansi, "") else s
+
     private val legacy = Regex("§.")
 
     fun stripFormatting(s: String) = s.replace(ansi, "").replace(legacy, "").trim()
