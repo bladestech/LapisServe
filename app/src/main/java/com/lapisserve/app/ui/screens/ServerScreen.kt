@@ -74,7 +74,7 @@ fun ServerScreen(manager: ServerManager, id: String, startTab: String, onBack: (
 
     val screenHaze = remember { dev.chrisbanes.haze.HazeState() }
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().haze(screenHaze)) {
+        Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier.statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -164,6 +164,7 @@ private fun OverviewTab(
     var chart by rememberSaveable { mutableIntStateOf(if (cfg.type == ServerType.PUMPKIN) 1 else 0) }
     val st = LocalStatusColors.current
     val cs = MaterialTheme.colorScheme
+    val advancedMode = com.lapisserve.app.ui.theme.LocalAppearance.current.advanced
     var n = 0
 
     LazyColumn(
@@ -346,13 +347,15 @@ private fun OverviewTab(
                 val eff = LaunchBuilder.effectiveCores(cfg, total, remember { com.lapisserve.app.system.SystemInfo.coreScores() })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Stat(Icons.Rounded.Memory, "${cfg.ramMb.humanMb()} RAM"); Stat(Icons.Rounded.DeveloperBoard, "$eff of $total cores")
-                    if (cfg.type.isJava) Stat(Icons.Rounded.CleaningServices, LaunchBuilder.resolveGc(cfg, eff).label)
-                    Stat(Icons.Rounded.Public, "View ${cfg.viewDistance} · Sim ${cfg.simulationDistance}")
+                    val advanced = advancedMode
+                    if (advanced && cfg.type.isJava) Stat(Icons.Rounded.CleaningServices, LaunchBuilder.resolveGc(cfg, eff).label)
+                    Stat(Icons.Rounded.Public, if (advanced) "View ${cfg.viewDistance} · Sim ${cfg.simulationDistance}" else "View ${cfg.viewDistance} chunks")
+                    Stat(Icons.Rounded.Group, "Up to ${cfg.maxPlayers} players")
                 }
                 TextButton(onSettings, contentPadding = PaddingValues(0.dp)) { Text("Edit resources") }
             }
         }
-        item {
+        if (advancedMode) item {
             Text(manager.dir(cfg.id).path, Modifier.padding(horizontal = 8.dp), style = com.lapisserve.app.ui.theme.MonoStyle, color = cs.outline)
         }
     }

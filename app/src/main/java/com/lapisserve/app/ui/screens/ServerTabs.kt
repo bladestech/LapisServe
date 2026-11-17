@@ -184,7 +184,7 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
                     it.copy(viewDistance = 10, simulationDistance = 8, cpuPriority = CpuPriority.NORMAL, gc = GcPreset.AUTO, preTouch = it.ramMb >= 2048) },
             )
             presets.forEach { p ->
-                OutlinedCard(onClick = { set(p.apply(cfg)); notify("${p.label} applied") }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(onClick = { set(p.apply(cfg)); notify("${p.label} applied") }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Icon(p.icon, null, tint = MaterialTheme.colorScheme.primary)
                         Column { Text(p.label, style = MaterialTheme.typography.titleSmall); Text(p.desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
