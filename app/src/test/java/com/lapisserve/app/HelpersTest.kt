@@ -2,7 +2,6 @@ package com.lapisserve.app
 
 import com.lapisserve.app.core.humanBytes
 import com.lapisserve.app.core.humanMb
-import com.lapisserve.app.engine.DnsHosts
 import com.lapisserve.app.model.ServerConfig
 import com.lapisserve.app.model.ServerType
 import com.lapisserve.app.model.displayVersion
@@ -14,19 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HelpersTest {
-    @Test fun parseExtraHosts_acceptsSeparatorsAndRejectsJunk() {
-        assertEquals(
-            listOf("example.com", "api.example.org", "foo.bar"),
-            DnsHosts.parseExtra("Example.com, api.example.org;\n foo.bar  localhost not_a_host http://x"),
-        )
-    }
-
-    @Test fun defaultHosts_coverPaperclipAndMojangAuth() {
-        for (h in listOf("piston-data.mojang.com", "sessionserver.mojang.com", "discovery.minecraftservices.com", "api.purpurmc.org")) {
-            assertTrue("missing $h", h in DnsHosts.defaultHosts)
-        }
-    }
-
     @Test fun modrinthGameVersion_stripsPreReleaseSuffix() {
         assertEquals("1.21.8", Modrinth.gameVersion("1.21.8-rc1"))
         assertEquals("26.3", Modrinth.gameVersion("26.3"))

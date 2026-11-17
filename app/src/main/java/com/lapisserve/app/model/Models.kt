@@ -75,8 +75,6 @@ data class ServerConfig(
     val preTouch: Boolean = false,
     val extraJvmArgs: String = "",
     val extraServerArgs: String = "",
-    /** Extra hostnames (space/comma separated) the server should be able to resolve, e.g. for plugins. */
-    val extraHosts: String = "",
     val javaMajorOverride: Int = 0,     // 0 = auto
     // ---- game
     val port: Int = 25565,

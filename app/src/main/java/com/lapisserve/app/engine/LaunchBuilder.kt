@@ -1,5 +1,6 @@
 package com.lapisserve.app.engine
 
+import com.lapisserve.app.core.McVersion
 import com.lapisserve.app.model.GcPreset
 import com.lapisserve.app.model.ServerConfig
 import com.lapisserve.app.model.ServerType
@@ -20,7 +21,7 @@ object LaunchBuilder {
         else -> GcPreset.G1_DEFAULT
     }
 
-    fun jvmArgs(c: ServerConfig, totalCores: Int, tmpDir: File, hostsFile: File? = null, javaMajor: Int = 21, plan: CorePlan? = null): List<String> {
+    fun jvmArgs(c: ServerConfig, totalCores: Int, tmpDir: File, javaMajor: Int = 21, plan: CorePlan? = null): List<String> {
         val p = plan ?: CoreTopology.plan(c, List(totalCores) { null })
         val cores = p.activeCores.coerceIn(1, totalCores.coerceAtLeast(1))
         // GC and JIT threads should not compete with the tick thread for its reserved core.
@@ -44,8 +45,7 @@ object LaunchBuilder {
         }
         a += "-Djava.io.tmpdir=${tmpDir.path}"
         a += "-Dfile.encoding=UTF-8"
-        // musl has no resolver config on Android; give the JVM a pre-resolved hosts file (supported on Java 9+).
-        if (hostsFile != null && javaMajor >= 9) a += "-Djdk.net.hosts.file=${hostsFile.path}"
+        a += Log4jFix.jvmArgs(c.type, c.version)
         a += "-XX:-UsePerfData"          // /tmp/hsperfdata is pointless on Android
         a += "-XX:+DisableExplicitGC"
         a += "-Xshare:auto"
@@ -185,5 +185,35 @@ object LaunchBuilder {
         }
         f.writeText(out.joinToString("\n") + "\n")
         return applied
+    }
+}
+
+/**
+ * Log4Shell (CVE-2021-44228) protection for old Minecraft versions, following Mojang's advisory:
+ * 1.17-1.18.0 need a system property; vanilla 1.7-1.16.5 need Mojang's replacement logging config.
+ * Paper and Purpur fixed their own builds, and LapisServe always installs their latest build of a version.
+ */
+object Log4jFix {
+    data class Config(val fileName: String, val url: String, val sha1: String)
+
+    private val FOR_1_12 = Config("log4j2_112-116.xml",
+        "https://launcher.mojang.com/v1/objects/02937d122c86ce73319ef9975b58896fc1b491d1/log4j2_112-116.xml",
+        "02937d122c86ce73319ef9975b58896fc1b491d1")
+    private val FOR_1_7 = Config("log4j2_17-111.xml",
+        "https://launcher.mojang.com/v1/objects/4bb89a97a66f350bc9f73b3ca8509632682aea2e/log4j2_17-111.xml",
+        "4bb89a97a66f350bc9f73b3ca8509632682aea2e")
+
+    fun configFor(type: ServerType, version: String): Config? = when {
+        type != ServerType.VANILLA -> null
+        McVersion.atLeast(version, "1.17") -> null
+        McVersion.atLeast(version, "1.12") -> FOR_1_12
+        McVersion.atLeast(version, "1.7") -> FOR_1_7
+        else -> null   // older versions don't use Log4j 2
+    }
+
+    fun jvmArgs(type: ServerType, version: String): List<String> = buildList {
+        if (!type.isJava) return@buildList
+        if (McVersion.atLeast(version, "1.7") && !McVersion.atLeast(version, "1.18.1")) add("-Dlog4j2.formatMsgNoLookups=true")
+        configFor(type, version)?.let { add("-Dlog4j.configurationFile=${it.fileName}") }
     }
 }

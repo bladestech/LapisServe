@@ -87,17 +87,22 @@ flowchart LR
     A[Create a server] --> B[Resolve version<br/>Mojang · PaperMC · PurpurMC · GitHub]
     B --> C[Download jar<br/>checksum verified]
     C --> D{Needs Java?}
-    D -- yes --> E[Temurin musl JRE<br/>Adoptium + Alpine musl runtime]
+    D -- yes --> E[musl JVM<br/>Temurin 21/25 or Alpine OpenJDK 8/11/17]
     D -- no --> G
-    E --> F[Pre-resolve hostnames<br/>→ hosts file for the JVM]
+    E --> F[Phone's DNS servers<br/>→ resolver file for the JVM]
     F --> G[Start in a foreground service<br/>wake and Wi-Fi locks]
     G --> H[Live console, CPU and RAM]
 ```
 
-- **Java on Android:** Android's libc can't run stock JVMs, so LapisServe downloads Eclipse Temurin for Linux/musl from Adoptium plus a small musl
-  C runtime from Alpine's package repository, and starts the JVM through the musl loader.
-- **DNS:** musl has no resolver configuration on Android, so the app resolves common hostnames itself and gives the JVM a hosts file
-  (`-Djdk.net.hosts.file`, Java 9+). Add extra hostnames per server for plugins that call other sites.
+- **Java on Android:** Android's libc can't run stock JVMs, so LapisServe uses JVMs built for musl and starts them through the musl loader
+  (a small musl C runtime comes from Alpine's package repository). Java 21 and 25 are Eclipse Temurin from Adoptium; Java 8, 11 and 17,
+  which Minecraft 1.20.4 and older need, are OpenJDK from Alpine's repository, because Adoptium doesn't build those for ARM64 musl.
+  Each Minecraft version gets the Java it asks for (1.17's Java 16 runs on 17).
+- **DNS:** musl reads `/etc/resolv.conf`, which Android doesn't have. LapisServe's copy of the musl loader is patched to read a
+  `lapis-resolv` file in the server's folder instead, filled with the phone's current DNS servers (plus 1.1.1.1 and 8.8.8.8 as backup) and
+  rewritten when the network changes. Every hostname resolves normally, on every Java version.
+- **Certificates:** Alpine's Java expects a system-generated CA list; LapisServe writes one from Android's trusted certificates.
+- **Old versions:** vanilla 1.7–1.16.5 get Mojang's replacement Log4j config and 1.17–1.18.0 the `formatMsgNoLookups` flag (Log4Shell).
 - **Pumpkin config:** Pumpkin writes a full `pumpkin.toml` on first run; LapisServe lets it, then patches only the keys it manages (Java and Bedrock).
 - **Cores:** per-core capacity from `/sys` decides the plan. The JVM is started under `taskset`, then each thread's affinity is checked and re-applied
   (Android resets it), with the busiest `Server thread` pinned to the fastest core. No root is needed: an app may set the affinity of its own processes.
@@ -107,8 +112,6 @@ flowchart LR
 ## ⚠️ Known limitations
 - **ARM64 only for servers.** Java servers run on real ARM64 phones. The x86_64 emulator can show the UI, but Android's seccomp filter kills musl
   binaries there, and the Android emulator can't run arm64 images on an x86 PC.
-- Online-mode login relies on the pre-resolved hostname list; unusual hosts must be added in the server's network settings.
-- Java 8 servers (Minecraft 1.16 and older) aren't supported by the DNS workaround.
 - Pumpkin is experimental upstream.
 - Tested so far on a single device (Snapdragon 8+ Gen 1, Android 15). See the [compatibility page](docs/COMPATIBILITY.md) and send a [device report](../../issues/new?template=device_report.yml).
 

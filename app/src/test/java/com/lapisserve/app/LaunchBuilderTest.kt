@@ -92,17 +92,16 @@ class LaunchBuilderTest {
         assertFalse(f.readText().contains("level = 1"))
     }
 
-    @Test fun jvmArgs_heapCoresAndHostsFile() {
-        val hosts = File(tmp.root, "lapis-hosts")
-        val args = LaunchBuilder.jvmArgs(cfg { copy(ramMb = 2048) }, totalCores = 8, tmpDir = tmp.root, hostsFile = hosts, javaMajor = 21)
+    @Test fun jvmArgs_heapAndCores_noHostsFile() {
+        val args = LaunchBuilder.jvmArgs(cfg { copy(ramMb = 2048) }, totalCores = 8, tmpDir = tmp.root, javaMajor = 21)
         assertTrue(args.contains("-Xmx2048M"))
         assertTrue(args.contains("-XX:ActiveProcessorCount=8"))
-        assertTrue(args.contains("-Djdk.net.hosts.file=${hosts.path}"))
+        assertFalse(args.any { it.startsWith("-Djdk.net.hosts.file") })
     }
 
-    @Test fun jvmArgs_skipsHostsFileOnJava8() {
-        val args = LaunchBuilder.jvmArgs(cfg(), 4, tmp.root, File(tmp.root, "h"), javaMajor = 8)
-        assertFalse(args.any { it.startsWith("-Djdk.net.hosts.file") })
+    @Test fun jvmArgs_java8_hasNoNewerOnlyFlags() {
+        val args = LaunchBuilder.jvmArgs(cfg { copy(version = "1.8.8", gc = com.lapisserve.app.model.GcPreset.ZGC) }, 8, tmp.root, javaMajor = 8)
+        assertFalse(args.any { it.contains("ZGC") || it.contains("ZGenerational") || it.contains("CompactObjectHeaders") })
     }
 
     @Test fun cpuPinning_limitsActiveProcessorCount() {

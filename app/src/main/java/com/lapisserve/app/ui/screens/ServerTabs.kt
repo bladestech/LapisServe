@@ -242,7 +242,7 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
 
         if (adv && cfg.type.isJava) SettingsCard("Java", Icons.Rounded.Coffee, Modifier.anchor("Java"), subtitle = "Runtime and garbage collector") {
             ChoiceRow("Garbage collector", GcPreset.entries, cfg.gc, { it.label }, { set(cfg.copy(gc = it)) }, desc = cfg.gc.blurb)
-            ChoiceRow("Java version", listOf(0, 8, 17, 21, 25), cfg.javaMajorOverride, { if (it == 0) "Auto" else "Java $it" }, { set(cfg.copy(javaMajorOverride = it)) },
+            ChoiceRow("Java version", listOf(0) + com.lapisserve.app.runtime.JavaRuntime.CHOICES, cfg.javaMajorOverride, { if (it == 0) "Auto" else "Java $it" }, { set(cfg.copy(javaMajorOverride = it)) },
                 desc = "Auto uses what Mojang recommends for ${cfg.version}. Downloaded from Adoptium on first use.")
             SwitchRow("Performance tuning", if (cfg.type.supportsPlugins)
                 "Tunes the JVM and Paper/Spigot/Bukkit configs for phones: entity activation ranges, item merging, spawn limits, faster redstone (Alternate Current) and fewer JIT threads. Turn off to edit those files yourself."
@@ -274,8 +274,6 @@ fun SettingsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, noti
         SettingsCard("Network & access", Icons.Rounded.Lan, Modifier.anchor("Network")) {
             TextRow("Port", cfg.port.toString(), { it.toIntOrNull()?.takeIf { p -> p in 1024..65535 }?.let { p -> set(cfg.copy(port = p)) } }, numeric = true, desc = "Default 25565. Must be unique per running server.")
             SwitchRow("Online mode", "Verify players with Mojang accounts. Requires working DNS inside the runtime; turn off for LAN play or cracked clients.", cfg.onlineMode, { set(cfg.copy(onlineMode = it)) })
-            if (adv && cfg.type.isJava) TextRow("Extra hostnames", cfg.extraHosts, { set(cfg.copy(extraHosts = it)) }, singleLine = false,
-                desc = "The Java runtime has no system DNS, so LapisServe pre-resolves Mojang, Paper and common plugin hosts. Add any other site your plugins call, separated by spaces.")
             SwitchRow("Whitelist", "Only listed players may join.", cfg.whitelist, { set(cfg.copy(whitelist = it)) })
             if (adv && cfg.type.isJava) SliderRow("Compression threshold", cfg.networkCompression, 0..1024, { set(cfg.copy(networkCompression = it)) }, { if (it == 0) "Always" else "$it bytes" }, step = 64,
                 desc = "Higher uses less CPU, more bandwidth. Raise it on a LAN.")

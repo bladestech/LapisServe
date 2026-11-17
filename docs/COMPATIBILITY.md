@@ -1,42 +1,55 @@
-# Device compatibility
+# Compatibility
 
-LapisServe runs real Java and native servers on Android, and phones differ (chipset, vendor battery management, Android version). This page
-records what has actually been tested. **Absence from the table means "unknown", not "doesn't work".**
+LapisServe runs real Java and native servers on Android. What decides how well it runs is mostly the **chipset** (speed, core layout,
+performance-hint support) and the **Android version** (process and syscall restrictions), not the phone brand, so results are recorded that way.
+**Absence from a table means "unknown", not "doesn't work".**
 
 ## How to read the status
 | Status | Meaning |
 | --- | --- |
-| ✅ Works | Started, reached the server's ready message, and ran for a while |
+| ✅ Works | Started, reached the server's ready message, and ran well |
+| 🐢 Slow | Works, but too slow to be enjoyable |
 | 🟡 Partial | Starts but with problems (see notes) |
 | ❌ Fails | Doesn't start or is killed |
 | ➖ Not tested | Nobody has tried this combination |
 
-"Works" here means the server reached its ready state and the app's meters, console and settings behaved. It does **not** yet mean long-session
-stability or a verified player join unless the notes say so.
-
-## Tested devices
-| Device | Chipset | Android | App | Vanilla | Paper | Purpur | Pumpkin | Tested |
-| --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| OnePlus CPH2415 | Snapdragon 8+ Gen 1 (SM8475), 8 cores, 7 GB RAM | 15 | 0.1.0 – 0.3.0 | 🟡 | ✅ | ✅ | ✅ | 2026-11 |
+## Chipsets
+| Chipset | Android | Vanilla | Paper | Purpur | Pumpkin | CPU boost hints | Tested |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | --- |
+| Snapdragon 8 Elite Gen 5 | 17 | ✅ | ✅ | ✅ | ✅ | ✅ | 0.3.x, 2026-11 |
+| Snapdragon 8+ Gen 1 (SM8475) | 15 | ✅ | ✅ | ✅ | ✅ | ❌ (not offered by the power HAL) | 0.1.0 – 0.4.0, 2026-11 |
+| Exynos 8890 | 16 (custom ROM) | 🐢 | 🐢 | 🐢 | ✅ | ❌ (too old) | 0.3.x, 2026-11 |
 
 ### Notes
-- **OnePlus CPH2415:** the author's phone and the only device tested so far.
-  - **Paper 26.3 and Purpur 26.3:** reached their ready message ("Done"). Paper also had a Modrinth plugin installed. No client join was tested.
-  - **Pumpkin 0.2.2:** starts, and settings written to `pumpkin.toml` are applied (Java and Bedrock sections).
-  - **Vanilla:** reported by the author as working for the most part; not exhaustively verified, hence 🟡.
-  - Java servers needed the app's DNS workaround (a pre-resolved hosts file) because Android has no `/etc/resolv.conf` for the JVM.
-  - **0.3.0 core pinning:** works without root (cores 1 prime + 3 performance + 4 efficiency). Tick focus measured ~2.3× lower tick time
-    than unpinned under load. Android periodically resets affinity and parks the prime core when warm; the app handles both.
-  - **CPU boost hints:** not available; this phone's power HAL reports no performance-hint support.
+- **Snapdragon 8 Elite Gen 5:** everything works, including CPU boost hints.
+- **Snapdragon 8+ Gen 1:** the main development device.
+  - Core pinning works without root (1 prime + 3 performance + 4 efficiency). Tick focus measured ~2.3× lower tick time than unpinned
+    under load. Android periodically resets affinity and parks the prime core when warm; the app handles both.
+  - Older Minecraft versions (0.4.0): Vanilla 1.8.9 (Java 8, with a status ping), Paper 1.12.2 (Java 8, downloads over HTTPS) and
+    Vanilla 1.17.1 (Java 17, with a status ping) all reached "Done".
+- **Exynos 8890:** everything starts, but the Java servers are very slow on this 2016 chip. Pumpkin, being native and multi-threaded, runs
+  decently.
+
+## Minecraft versions
+Since 0.4.0 the app picks the Java version each Minecraft version needs and downloads it on first use:
+
+| Minecraft | Java | Source |
+| --- | --- | --- |
+| 1.16.5 and older | 8 | OpenJDK from Alpine Linux |
+| 1.17 – 1.20.4 | 17 | OpenJDK from Alpine Linux |
+| 1.20.5 – 1.21.x | 21 | Eclipse Temurin |
+| 26.x | 25 | Eclipse Temurin |
+
+Java 11 is also available in a server's settings for software that wants it. Vanilla 1.7 – 1.18 gets Mojang's Log4Shell mitigation automatically.
 
 ## Known not to work
 | Environment | Why |
 | --- | --- |
-| Android emulator on an x86_64 PC | Android's seccomp filter kills musl-based binaries (the Java runtime). The UI works; Java servers don't. |
+| Android emulator on an x86_64 PC | Android's syscall filter kills the musl-based Java runtime there. The UI works; Java servers don't. |
 | Non-ARM64 devices | Pumpkin only publishes an ARM64 Android build |
 
 ## Add your device
-Open a [device report](../../../issues/new?template=device_report.yml) with your phone, Android version and what you tried. Include the
+Open a [device report](../../../issues/new?template=device_report.yml) with your chipset, Android version and what you tried. Include the
 console log from **Console → Share log** if something failed. Reports with logs make fixes much easier.
 
 Tips that often decide whether a server survives in the background:
