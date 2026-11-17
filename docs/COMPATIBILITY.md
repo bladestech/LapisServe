@@ -37,6 +37,6 @@ Open a [device report](../../../issues/new?template=device_report.yml) with your
 console log from **Console → Share log** if something failed. Reports with logs make fixes much easier.
 
 Tips that often decide whether a server survives in the background:
-- In the app, open **Device tuning** and apply its suggestions.
+- In the app, open the **Device** tab and apply its suggestions.
 - Allow unrestricted battery use for LapisServe.
 - On Android 12 and newer, turn off *Disable child process restrictions* in Developer options if your phone offers it.

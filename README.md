@@ -46,7 +46,7 @@ from the same screen it runs on, with the knobs a real host expects and none of 
 | 🔔 **Activity feed and alerts** | Starts, stops, crashes and joins in one timeline; a notification if a server stops unexpectedly |
 | 💾 **Backups** | One-tap world, whitelist, ops and ban backups with a safe restore |
 | 🎚️ **Real resource control** | RAM up to 90% of the device, per-core pinning, scheduling priority, garbage collector, Java version, one-tap presets |
-| 🛡️ **Device tuning** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
+| 🛡️ **Device checkup** | Tells you which Android settings keep a server alive in the background, and shows your chip and core layout |
 | 🔌 **Plugins** | Search, install and manage plugins from Modrinth, with required dependencies resolved (optional) |
 | 🎨 **Make it yours** | Glass UI with an animated backdrop, six accent colours, light, dark and AMOLED themes, wallpaper colours, reduce-motion |
 
@@ -65,7 +65,7 @@ how much is in use right now, and warns you if what you ask for plus what Androi
 ## 📲 Install
 1. Download the latest APK from the [**Releases**](../../releases/latest) page. Each release includes a SHA-256 checksum.
 2. Allow installing from your browser or file manager when Android asks.
-3. Open LapisServe, tap **Device tuning**, and follow the suggestions. This is what decides whether your server survives with the screen off.
+3. Open LapisServe, go to the **Device** tab, and follow the suggestions. This is what decides whether your server survives with the screen off.
 4. Tap **New server**, pick your software and version, and press **Start**. The first launch downloads what it needs.
 
 > **Good to know:** you'll want an **ARM64 phone with at least 4 GB of RAM**. LapisServe isn't on the Play Store (see
