@@ -17,7 +17,7 @@ stability or a verified player join unless the notes say so.
 ## Tested devices
 | Device | Chipset | Android | App | Vanilla | Paper | Purpur | Pumpkin | Tested |
 | --- | --- | --- | --- | :---: | :---: | :---: | :---: | --- |
-| OnePlus CPH2415 | Snapdragon 8+ Gen 1 (SM8475), 8 cores, 7 GB RAM | 15 | 0.1.0 and 0.2.0 (preview) | 🟡 | ✅ | ✅ | ✅ | 2026-11 |
+| OnePlus CPH2415 | Snapdragon 8+ Gen 1 (SM8475), 8 cores, 7 GB RAM | 15 | 0.1.0, 0.2.0 | 🟡 | ✅ | ✅ | ✅ | 2026-11 |
 
 ### Notes
 - **OnePlus CPH2415:** the author's phone and the only device tested so far.

@@ -2,7 +2,7 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
-## [0.2.0] - unreleased
+## [0.2.0] - 2026-11-17
 
 ### Added
 - **A new look.** A glass design system: animated colour backdrop, frosted cards, floating blurred navigation, spring animations, shared-element
