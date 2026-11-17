@@ -2,6 +2,50 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.3.0] - 2026-11-17
+
+### Performance
+- **Tick focus.** Java Minecraft servers run almost all game logic on one thread. LapisServe now reads the phone's core layout (from the
+  kernel's per-core capacity, so it works for 1+3+4, 2+6, 1+2+5, 4+4, all-big and uniform chips) and, by default, gives the main game-loop
+  thread the fastest core to itself while everything else runs on the other fast cores. Under a fixed load of 450 mobs on a Snapdragon 8+ Gen 1:
+
+  | Core layout | Average tick time |
+  | --- | --- |
+  | Tick focus (new default) | **~10 ms** |
+  | Performance cores only | ~14 ms |
+  | All cores (0.2.x behaviour) | ~23.5 ms |
+  | Efficiency cores only | ~43 ms |
+
+- **Pinning that sticks.** Android resets an app's core affinity as it moves between foreground and background, so LapisServe now checks and
+  re-applies it continuously. When Android parks the fastest core to cool down, the game loop moves to the other fast cores until it returns.
+- **CPU boost hints.** On phones whose power HAL supports Android's performance-hint API, the tick thread (or Pumpkin's ticker and simulation
+  threads) reports its workload so Android raises clocks before a tick runs late. Not every phone supports it; the console says which.
+- **JVM tuning.** GC and JIT thread pools sized to the cores the server may use, fewer JIT threads, a larger starting heap to avoid
+  grow-and-collect cycles while exploring, compact object headers on Java 25, and an optional ZGC collector (Advanced).
+- **Server config tuning** (switchable per server): Paper/Spigot/Bukkit settings from the common optimisation guides (entity activation
+  ranges, item merging, spawn limits, cheaper explosions and pathfinding, Alternate Current redstone) and a smaller entity broadcast range.
+  Pumpkin gets faster chunk compression and worker counts that match its cores.
+- **Core layout picker** (Advanced): Automatic, Tick focus, Performance cores, All cores or Manual. The per-core picker now labels mid-tier
+  cores correctly as performance cores and shows each core's clock.
+
+### Added
+- **Simple mode (default).** Server settings show what most people need; cores, Java, GC, JVM arguments, DNS hosts and other expert options
+  move behind an **Advanced** switch in Settings. A Performance card explains what was tuned automatically.
+- **Friendlier server creation.** Choose by goal ("Play with friends", "Pure vanilla", "Extra gameplay options", "Lightweight & Bedrock"), pick
+  how many players (which sets the player cap, view distances and a RAM recommendation), choose Survival, Creative or Hardcore, accept the
+  EULA, and **Create & start** in one go. The latest version is picked automatically.
+
+### Changed
+- **Calmer look.** The glass design is replaced with solid Material 3 surfaces: no blur, no translucent cards, and a faint static background.
+  The moving background is now off by default (it can still be turned on in Settings).
+- Pumpkin's anonymous telemetry is switched off in the config LapisServe writes, in line with the app's no-telemetry promise.
+
+### Fixed
+- Pumpkin's console showed raw colour codes (`[2m…[0m`).
+
+### Tests
+- 62 unit tests (core plans for many chip layouts, YAML patching, Pumpkin tuning, colour-code stripping, RAM recommendations).
+
 ## [0.2.1] - 2026-11-17
 
 ### Added

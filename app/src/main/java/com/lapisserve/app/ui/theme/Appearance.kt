@@ -28,7 +28,9 @@ data class Appearance(
     /** Use the wallpaper-based Material You palette instead of the accent (Android 12+). */
     val dynamicColor: Boolean = false,
     val reduceMotion: Boolean = false,
-    val animatedBackdrop: Boolean = true,
+    val animatedBackdrop: Boolean = false,
+    /** Show every server setting. Off (Simple mode) hides what LapisServe tunes automatically. */
+    val advanced: Boolean = false,
 )
 
 /** Small persisted app preferences, exposed as a flow so the UI recomposes on change. */
@@ -42,14 +44,17 @@ class AppPrefs(context: Context) {
         accent = runCatching { Accent.valueOf(sp.getString("accent", "LAPIS")!!) }.getOrDefault(Accent.LAPIS),
         dynamicColor = sp.getBoolean("dynamic", false),
         reduceMotion = sp.getBoolean("reduceMotion", false),
-        animatedBackdrop = sp.getBoolean("backdrop", true),
+        // New key: the calmer design ships with the moving background off, even for people who had it on.
+        animatedBackdrop = sp.getBoolean("backdrop2", false),
+        advanced = sp.getBoolean("advanced", false),
     )
 
     fun update(f: (Appearance) -> Appearance) {
         val a = f(_appearance.value)
         _appearance.value = a
         sp.edit().putString("mode", a.mode.name).putString("accent", a.accent.name).putBoolean("dynamic", a.dynamicColor)
-            .putBoolean("reduceMotion", a.reduceMotion).putBoolean("backdrop", a.animatedBackdrop).apply()
+            .putBoolean("reduceMotion", a.reduceMotion).putBoolean("backdrop2", a.animatedBackdrop)
+            .putBoolean("advanced", a.advanced).apply()
     }
 }
 

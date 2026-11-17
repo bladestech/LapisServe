@@ -330,15 +330,15 @@ fun animateColorAsStateCompat(target: Color): State<Color> =
 
 /** Core selector: tap cores to pin the server to them. Labels big/little clusters when frequency data is available. */
 @Composable
-fun CoreSelector(totalCores: Int, mask: Int, freqs: List<Long?>, onChange: (Int) -> Unit) {
-    val max = freqs.filterNotNull().maxOrNull()
-    val min = freqs.filterNotNull().minOrNull()
-    val hetero = max != null && min != null && max != min
+fun CoreSelector(totalCores: Int, mask: Int, freqs: List<Long?>, onChange: (Int) -> Unit, scores: List<Long?> = freqs) {
+    val perfMask = com.lapisserve.app.engine.CoreTopology.performanceMask(scores)
+    val hetero = perfMask != 0
+    val best = com.lapisserve.app.engine.CoreTopology.bestCore(scores)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (i in 0 until totalCores) {
             val on = mask == 0 || (mask shr i) and 1 == 1
             val f = freqs.getOrNull(i)
-            val big = hetero && f != null && f >= max!! * 0.9
+            val big = hetero && (perfMask shr i) and 1 == 1
             FilterChip(
                 selected = on,
                 onClick = {
@@ -350,7 +350,8 @@ fun CoreSelector(totalCores: Int, mask: Int, freqs: List<Long?>, onChange: (Int)
                 },
                 label = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Core $i")
-                    if (hetero && f != null) Text(if (big) "Performance" else "Efficiency", style = MaterialTheme.typography.labelSmall)
+                    if (hetero && f != null) Text(if (i == best) "Fastest" else if (big) "Performance" else "Efficiency", style = MaterialTheme.typography.labelSmall)
+                    if (f != null) Text("%.2f GHz".format(f / 1_000_000.0), style = MaterialTheme.typography.labelSmall)
                 } },
             )
         }

@@ -79,7 +79,7 @@ fun AppShell(manager: ServerManager, prefs: AppPrefs) {
     CompositionLocalProvider(LocalHazeState provides hazeState) {
         LapisBackdrop {
             // The screen content is the blur source; the nav bar below is its sibling so it can blur what scrolls beneath it.
-            Box(Modifier.fillMaxSize().haze(hazeState)) { SharedTransitionLayout {
+            Box(Modifier.fillMaxSize()) { SharedTransitionLayout {
                 AnimatedContent(
                     targetState = stack.lastOrNull(), label = "route",
                     transitionSpec = {

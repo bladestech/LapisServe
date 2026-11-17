@@ -21,12 +21,40 @@ enum class GcPreset(val label: String, val blurb: String) {
     G1_DEFAULT("G1 · Default", "JVM default. Solid all-rounder."),
     PARALLEL("Parallel", "Higher throughput, longer pauses. Fine on small heaps."),
     SERIAL("Serial", "Lowest overhead. Best for 1 GB or less, or 1-2 cores."),
+    ZGC("ZGC · Experimental", "Collects in the background with sub-millisecond pauses, so GC never stalls a tick. Uses more memory and CPU; Java 21+, 3 GB+ heaps."),
 }
 
 enum class CpuPriority(val label: String, val nice: Int) {
     NORMAL("Normal", 0),
     GENTLE("Gentle", 5),
     BACKGROUND("Background", 10),
+}
+
+/** "How many players?" on the create screen: sets player cap, world distances and a RAM suggestion together. */
+enum class PlayerSize(val label: String, val range: String, val maxPlayers: Int, val viewDistance: Int, val simulationDistance: Int) {
+    FEW("Friends", "1-3", 4, 7, 5),
+    GROUP("Group", "4-8", 8, 6, 4),
+    MANY("Community", "9+", 20, 5, 4);
+
+    /** Suggested heap for this size, kept within the phone's comfortable range and snapped to 128 MB. */
+    fun recommendedRamMb(type: ServerType, comfortMb: Int): Int {
+        val want = if (type == ServerType.PUMPKIN) when (this) { FEW -> 512; GROUP -> 1024; MANY -> 1536 }
+        else when (this) {
+            FEW -> if (type == ServerType.VANILLA) 1536 else 2048
+            GROUP -> 3072
+            MANY -> 4096
+        }
+        val floor = if (type == ServerType.PUMPKIN) 256 else 1024
+        return (want.coerceAtMost(comfortMb).coerceAtLeast(floor) / 128) * 128
+    }
+}
+
+enum class CoreStrategy(val label: String, val blurb: String) {
+    AUTO("Automatic", "Picks the best layout for this phone and server type."),
+    FOCUS("Tick focus", "Performance cores only, with the fastest core kept for the main tick thread."),
+    PERFORMANCE("Performance cores", "Keeps the server off the efficiency cores."),
+    ALL("All cores", "Lets Android place threads anywhere. Coolest and most battery-friendly."),
+    MANUAL("Manual", "Choose the cores yourself."),
 }
 
 @Serializable
@@ -38,7 +66,10 @@ data class ServerConfig(
     val createdAt: Long = System.currentTimeMillis(),
     // ---- resources
     val ramMb: Int = 1024,
-    val cpuMask: Int = 0,               // bitmask of pinned cores, 0 = no pinning
+    val cpuMask: Int = 0,               // bitmask of pinned cores, 0 = no pinning (used by CoreStrategy.MANUAL)
+    val coreStrategy: CoreStrategy = CoreStrategy.AUTO,
+    /** Apply LapisServe's performance tuning to server.properties, paper, spigot and bukkit configs. */
+    val autoTune: Boolean = true,
     val cpuPriority: CpuPriority = CpuPriority.NORMAL,
     val gc: GcPreset = GcPreset.AUTO,
     val preTouch: Boolean = false,

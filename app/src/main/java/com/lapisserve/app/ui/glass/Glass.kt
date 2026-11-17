@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -43,8 +44,9 @@ fun LapisBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.(
     val a by t.animateFloat(0f, 1f, infiniteRepeatable(tween(42_000, easing = LinearEasing), RepeatMode.Reverse), label = "a")
     val b by t.animateFloat(0f, 1f, infiniteRepeatable(tween(57_000, easing = LinearEasing), RepeatMode.Reverse), label = "b")
     val c by t.animateFloat(0f, 1f, infiniteRepeatable(tween(71_000, easing = LinearEasing), RepeatMode.Reverse), label = "c")
-    val pa = if (animated) a else .3f; val pb = if (animated) b else .6f; val pc = if (animated) c else .5f
-    val strength = if (dark) 1f else .55f
+    val pa = if (animated) a else .3f; val pb = if (animated) b else .6f
+    // Deliberately faint: a hint of the accent at the top, nothing that moves under the content by default.
+    val strength = if (dark) .55f else .35f
 
     Box(modifier.fillMaxSize().background(cs.background)
         .drawBehind {
@@ -52,9 +54,7 @@ fun LapisBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.(
             fun bloom(color: Color, cx: Float, cy: Float, radius: Float, alpha: Float) = drawRect(
                 Brush.radialGradient(listOf(color.copy(alpha = alpha * strength), Color.Transparent), Offset(cx, cy), radius),
             )
-            bloom(cs.primary, w * (0.15f + 0.55f * pa), h * (0.08f + 0.18f * pb), r * 0.75f, .30f)
-            bloom(cs.tertiary, w * (0.95f - 0.5f * pb), h * (0.45f + 0.15f * pc), r * 0.65f, .16f)
-            bloom(cs.secondary, w * (0.1f + 0.35f * pc), h * (0.92f - 0.2f * pa), r * 0.70f, .18f)
+            bloom(cs.primary, w * (0.2f + 0.5f * pa), h * (0.02f + 0.08f * pb), r * 0.6f, .22f)
         },
     ) {
         // Without a Surface above us, nothing else sets the default text colour for the whole app.
@@ -62,11 +62,15 @@ fun LapisBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.(
     }
 }
 
-/** A frosted card: translucent fill, a light-catching edge, and a gentle press response when clickable. */
+/**
+ * The app's card: a solid Material 3 tonal surface (no translucency or shiny edges), a gentle press response
+ * when clickable, and a clear accent outline when [tint] marks it as selected or highlighted.
+ * (Named GlassCard for history; it is no longer glass.)
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(28.dp),
+    shape: Shape = RoundedCornerShape(24.dp),
     tint: Color? = null,
     onClick: (() -> Unit)? = null,
     padding: PaddingValues = PaddingValues(20.dp),
@@ -76,37 +80,24 @@ fun GlassCard(
     val cs = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.975f else 1f, spring(dampingRatio = 0.62f, stiffness = 420f), label = "press")
+    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "press")
 
-    val fillTop = if (dark) Color.White.copy(alpha = .085f) else Color.White.copy(alpha = .72f)
-    val fillBottom = if (dark) Color.White.copy(alpha = .045f) else Color.White.copy(alpha = .50f)
-    val edgeHi = if (dark) Color.White.copy(alpha = .28f) else Color.White.copy(alpha = .95f)
-    val edgeLo = if (dark) Color.White.copy(alpha = .05f) else cs.outlineVariant.copy(alpha = .35f)
-
-    var m = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape)
-        .background(Brush.verticalGradient(listOf(fillTop, fillBottom)))
-    if (tint != null) m = m.background(tint.copy(alpha = if (dark) .14f else .10f))
-    m = m.border(BorderStroke(1.dp, Brush.linearGradient(listOf(edgeHi, edgeLo, edgeHi.copy(alpha = edgeHi.alpha * .35f)))), shape)
+    val fill = if (dark) cs.surfaceContainer else cs.surfaceContainerLow
+    var m = modifier.graphicsLayer { scaleX = scale; scaleY = scale }.clip(shape).background(fill)
+    m = if (tint != null) m.background(tint.copy(alpha = if (dark) .12f else .08f)).border(BorderStroke(1.5.dp, tint.copy(alpha = .7f)), shape)
+        else m.border(BorderStroke(1.dp, cs.outlineVariant.copy(alpha = if (dark) .45f else .6f)), shape)
     if (onClick != null) m = m.clickable(interaction, indication = null, onClick = onClick)
     Column(m.padding(padding), content = content)
 }
 
-/** Real backdrop blur for floating chrome (nav bar, top bar, sheets). Falls back to a tint below Android 12. */
+/** Floating chrome (nav bar, bottom action bars): a solid raised surface, no blur. */
 @Composable
-fun Modifier.glassBar(shape: Shape, hazeState: HazeState? = LocalHazeState.current): Modifier {
+fun Modifier.glassBar(shape: Shape, @Suppress("UNUSED_PARAMETER") hazeState: HazeState? = LocalHazeState.current): Modifier {
     val cs = MaterialTheme.colorScheme
     val dark = LocalIsDark.current
-    val base = this.clip(shape)
-    val withBlur = if (hazeState != null) base.hazeChild(hazeState) {
-        blurRadius = 22.dp
-        noiseFactor = 0.03f
-        backgroundColor = cs.surface
-        tints = listOf(HazeTint(cs.surface.copy(alpha = if (dark) .30f else .50f)), HazeTint(Color.White.copy(alpha = if (dark) .05f else .22f)))
-    } else base.background(cs.surface.copy(alpha = .9f))
-    return withBlur.border(
-        BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) .26f else .9f), Color.White.copy(alpha = if (dark) .06f else .3f)))),
-        shape,
-    )
+    return this.shadow(if (dark) 0.dp else 6.dp, shape, clip = false).clip(shape)
+        .background(if (dark) cs.surfaceContainerHigh else cs.surfaceContainerLowest)
+        .border(BorderStroke(1.dp, cs.outlineVariant.copy(alpha = if (dark) .5f else .4f)), shape)
 }
 
 /** Hairline divider that reads on glass. */

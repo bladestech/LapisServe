@@ -13,6 +13,7 @@ import com.lapisserve.app.model.*
 import com.lapisserve.app.providers.Providers
 import com.lapisserve.app.runtime.JavaRuntime
 import com.lapisserve.app.service.ServerService
+import com.lapisserve.app.system.SystemInfo
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -117,8 +118,9 @@ class ServerManager(private val app: Context) {
         persist()
     }
 
-    fun create(type: ServerType, version: String, name: String, ramMb: Int): ServerConfig {
-        val c = ServerConfig(
+    /** Creates a server; [customize] applies the choices made on the create screen on top of the defaults. */
+    fun create(type: ServerType, version: String, name: String, ramMb: Int, customize: (ServerConfig) -> ServerConfig = { it }): ServerConfig {
+        val base = ServerConfig(
             id = UUID.randomUUID().toString().take(8), name = name.ifBlank { "${type.label} server" },
             type = type, version = version, ramMb = ramMb,
             gc = GcPreset.AUTO,
@@ -126,6 +128,7 @@ class ServerManager(private val app: Context) {
             viewDistance = if (type == ServerType.PUMPKIN) 10 else 6,
             simulationDistance = if (type == ServerType.PUMPKIN) 8 else 4,
         )
+        val c = customize(base).copy(id = base.id)
         _servers.update { it + c }; persist()
         return c
     }
@@ -287,7 +290,14 @@ class ServerManager(private val app: Context) {
                 val (n, failed) = DnsHosts.write(hostsFile, c.extraHosts)
                 log(id, "DNS: resolved $n hostnames for the Java runtime." + if (failed.isNotEmpty()) " Could not resolve: ${failed.joinToString()}" else "", LogLine.Kind.SYSTEM)
             }
-            if (c.type.isJava) LaunchBuilder.writeJavaConfig(c, d) else {
+            if (c.type.isJava) {
+                LaunchBuilder.writeJavaConfig(c, d)
+                if (c.autoTune && c.type.supportsPlugins) {
+                    val tuned = runCatching { PerfTuning.apply(c, d) }.getOrNull()
+                    if (tuned != null) log(id, tuned, LogLine.Kind.SYSTEM)
+                    else if (PerfTuning.firstRunPending(d)) log(id, "Performance tuning: the server writes its config files on first start; tuning applies from the next start.", LogLine.Kind.SYSTEM)
+                }
+            } else {
                 if (!File(d, "pumpkin.toml").exists()) bootstrapPumpkin(id, d, File(d, c.jarFile))
                 val applied = LaunchBuilder.patchPumpkinConfig(c, d)
                 if (applied == null) log(id, "Config: pumpkin.toml was not created, so your settings could not be applied.", LogLine.Kind.WARN)
@@ -295,16 +305,18 @@ class ServerManager(private val app: Context) {
             }
 
             val cores = Runtime.getRuntime().availableProcessors()
+            val plan = CoreTopology.plan(c, SystemInfo.coreScores())
+            log(id, "Cores: " + describePlan(plan, cores), LogLine.Kind.SYSTEM)
             val cmd = ArrayList<String>()
             var javaEnv: Map<String, String> = emptyMap()
-            cmd += LaunchBuilder.schedulingPrefix(c)
+            cmd += LaunchBuilder.schedulingPrefix(c, plan)
             if (c.type.isJava) {
                 val major = c.javaMajorOverride.takeIf { it > 0 } ?: File(d, ".java-major").readTextOrNull()?.trim()?.toIntOrNull() ?: 21
                 cmd += java.commandPrefix(major)
                 javaEnv = java.environment(major)
-                cmd += LaunchBuilder.jvmArgs(c, cores, File(d, "tmp"), hostsFile, major)
+                cmd += LaunchBuilder.jvmArgs(c, cores, File(d, "tmp"), hostsFile, major, plan)
                 cmd += listOf("-jar", c.jarFile, "nogui")
-            } else cmd += File(d, c.jarFile).path
+            } else { cmd += File(d, c.jarFile).path; javaEnv = LaunchBuilder.nativeEnv(plan) }
             if (c.extraServerArgs.isNotBlank()) cmd += LaunchBuilder.splitArgs(c.extraServerArgs)
 
             log(id, "$ " + cmd.joinToString(" ").take(600), LogLine.Kind.SYSTEM)
@@ -320,14 +332,25 @@ class ServerManager(private val app: Context) {
             setState(id) { ServerRuntime(state = RunState.STARTING, pid = pid) }
             ServerService.refresh()
 
-            val allowed = LaunchBuilder.effectiveCores(c, cores)
+            val allowed = plan.activeCores
+            val focus = if (plan.mask != 0 || plan.dedicatedTick) scope.launch {
+                Affinity.enforce(pid, plan, c.type.isJava, cores) { msg ->
+                    if (msg.startsWith("!")) log(id, msg.drop(1), LogLine.Kind.WARN) else log(id, msg, LogLine.Kind.SYSTEM)
+                }
+            } else null
+            val boost = if (c.autoTune) scope.launch {
+                TickBoost.run(app, pid, c.type.isJava, { runtime(id).state == RunState.RUNNING }) { msg ->
+                    if (msg.startsWith("!")) log(id, msg.drop(1), LogLine.Kind.WARN) else log(id, msg, LogLine.Kind.SYSTEM)
+                }
+            } else null
             val metrics = scope.launch { metricsLoop(id, l, pid, allowed) }
             val vitals = scope.launch { vitalsLoop(id, l, allowed) }
             val dnsRefresh = if (c.type.isJava) scope.launch { while (isActive) { delay(5 * 60_000L); runCatching { DnsHosts.write(hostsFile, config(id)?.extraHosts ?: "") } } } else null
             val readyRegex = if (c.type.isJava) Regex("""Done \(.*\)! For help""") else Regex("""(?i)(done|started|listening|ready)""")
             val fallbackReady = if (!c.type.isJava) scope.launch { delay(20_000); markRunning(id) } else null
             withContext(Dispatchers.IO) {
-                forEachLineSafely(proc.inputStream) { line ->
+                forEachLineSafely(proc.inputStream) { raw ->
+                    val line = ConsoleParsers.stripAnsi(raw)
                     val ours = System.currentTimeMillis() < (pollWindow[id] ?: 0L) && ConsoleParsers.isPollingOutput(line)
                     if (!ours) log(id, line, classify(line))
                     if (readyRegex.containsMatchIn(line)) markRunning(id)
@@ -335,7 +358,7 @@ class ServerManager(private val app: Context) {
                 }
             }
             val code = withContext(Dispatchers.IO) { proc.waitFor() }
-            fallbackReady?.cancel(); metrics.cancel(); vitals.cancel(); dnsRefresh?.cancel(); tracked.remove(id); pollWindow.remove(id)
+            fallbackReady?.cancel(); focus?.cancel(); boost?.cancel(); metrics.cancel(); vitals.cancel(); dnsRefresh?.cancel(); tracked.remove(id); pollWindow.remove(id)
             live.remove(id)
             if (l.stopRequested || code == 0) {
                 log(id, "-- server stopped (exit $code) --", LogLine.Kind.SYSTEM)
@@ -356,6 +379,12 @@ class ServerManager(private val app: Context) {
             if (!live.containsKey(id)) releaseLocks(id)
             ServerService.refresh()
         }
+    }
+
+    private fun describePlan(p: CorePlan, total: Int): String = when {
+        p.dedicatedTick -> "${p.strategy.label}: tick thread gets cpu${p.tickCore}, everything else ${CoreTopology.describe(p.restMask, total)}."
+        p.mask != 0 -> "${p.strategy.label}: pinned to ${CoreTopology.describe(p.mask, total)} (${p.activeCores} of $total)."
+        else -> "${p.strategy.label}: all $total cores."
     }
 
     private fun hint(code: Int) = when (code) {
