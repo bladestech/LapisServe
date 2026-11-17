@@ -1,0 +1,19 @@
+# Gradle / Android
+.gradle/
+build/
+local.properties
+.kotlin/
+.idea/
+*.iml
+captures/
+*.apk
+*.aab
+
+# Signing material: never commit
+keystore.properties
+*.jks
+*.keystore
+
+# OS
+.DS_Store
+Thumbs.db
