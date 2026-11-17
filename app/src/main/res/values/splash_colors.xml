@@ -1,0 +1,4 @@
+<resources>
+    <!-- Matches the app's light background for the default Lapis accent. -->
+    <color name="splash_background">#F2F4FA</color>
+</resources>
