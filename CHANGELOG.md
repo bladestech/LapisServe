@@ -2,7 +2,7 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.2.1] - 2026-11-17
 
 ### Added
 - **Restart and Force-stop (kill) buttons** beside Start/Stop on a server's Overview. Force stop asks first and explains the risk; it is also

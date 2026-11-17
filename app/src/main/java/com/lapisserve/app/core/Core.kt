@@ -32,7 +32,7 @@ enum class Arch(val adoptium: String, val alpine: String, val muslLoader: String
 }
 
 object Http {
-    private const val UA = "bladestech/LapisServe/0.2.0 (+https://github.com/bladestech/LapisServe)"
+    private const val UA = "bladestech/LapisServe/0.2.1 (+https://github.com/bladestech/LapisServe)"
 
     private fun open(url: String): HttpURLConnection {
         var u = url
