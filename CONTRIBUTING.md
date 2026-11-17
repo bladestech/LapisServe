@@ -30,7 +30,7 @@ changes on a real phone (wireless debugging works well). Pumpkin is ARM64-only u
 - Never commit secrets, keystores, downloaded runtimes, server jars, plugins or another project's logos.
 
 ## Release signing (maintainers)
-Releases are built by CI from a version tag. The signing key is provided through repository secrets (`LAPIS_KEYSTORE_B64`,
+Releases can be built by CI from a version tag once you set the repository variable `RELEASE_FROM_CI=true`; until then the release job is skipped and releases are built locally. The signing key is provided through repository secrets (`LAPIS_KEYSTORE_B64`,
 `LAPIS_KEYSTORE_PASSWORD`, `LAPIS_KEY_ALIAS`, `LAPIS_KEY_PASSWORD`). Locally, put the same values in a git-ignored `keystore.properties`:
 
 ```properties
