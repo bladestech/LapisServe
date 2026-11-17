@@ -26,8 +26,8 @@ android {
         // directory for apps targeting >= 29. LapisServe downloads its runtimes (Java, Pumpkin)
         // at run time, so it must be able to execute them. Same trade-off Termux makes.
         targetSdk = 28
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

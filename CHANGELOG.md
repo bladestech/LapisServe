@@ -2,6 +2,19 @@
 
 All notable changes to LapisServe. Versions follow [Semantic Versioning](https://semver.org).
 
+## [0.3.1] - 2026-11-17
+
+### Added
+- **Animated logo.** The LapisServe logo is now drawn by the app itself, so it is sharp at any size and animates at your screen's
+  refresh rate. The S draws itself bar by bar with a glowing pen tip.
+- **New launch splash.** The S draws itself, its top bar runs to the edge of the screen, and a bright bar sweeps back to reveal your
+  servers, which have loaded underneath. Android's own splash now shows just the background colour so the handoff is seamless.
+- **Logo loaders** for the two longest waits: setting up a server (the S fills to match the download) and loading the plugin browser.
+- **Two-tone logo** in your accent colour, used in the light theme and on empty screens (no servers, plugins or activity yet).
+
+### Notes
+- With reduce motion on, the splash and loaders show the logo without animating.
+
 ## [0.3.0] - 2026-11-17
 
 ### Performance
