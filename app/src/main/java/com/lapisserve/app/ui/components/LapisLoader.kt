@@ -12,7 +12,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -24,6 +27,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -32,6 +36,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lapisserve.app.ui.theme.LocalAppearance
+import com.lapisserve.app.ui.theme.LocalIsDark
 
 /**
  * The LapisServe logo drawing itself: the green S is laid down bar by bar (bottom, right, middle, left, top) with a glowing
@@ -41,7 +46,7 @@ import com.lapisserve.app.ui.theme.LocalAppearance
  * - [progress] null: it runs as a snake, drawing in and then erasing from the start.
  */
 @Composable
-fun LapisLoader(modifier: Modifier = Modifier, size: Dp = 96.dp, progress: Float? = null) {
+fun LapisLoader(modifier: Modifier = Modifier, size: Dp = 96.dp, progress: Float? = null, colors: LogoColors = defaultLogoColors()) {
     val reduce = LocalAppearance.current.reduceMotion
     val t by rememberInfiniteTransition(label = "lapis")
         .animateFloat(0f, SNAKE_MS, infiniteRepeatable(tween(SNAKE_MS.toInt(), easing = LinearEasing)), label = "t")
@@ -53,22 +58,22 @@ fun LapisLoader(modifier: Modifier = Modifier, size: Dp = 96.dp, progress: Float
     }
     Canvas(modifier.size(size).then(desc)) {
         when {
-            progress != null -> drawLapisLogo(head = shown, tail = 0f, tip = shown < 0.999f)
-            reduce -> drawLapisLogo(head = 1f, tail = 0f, tip = false)
-            else -> drawLapisLogo(head = up(t, 0f, 1400f), tail = up(t, 1250f, 2600f), tip = true)
+            progress != null -> drawLapisLogo(head = shown, tail = 0f, tip = shown < 0.999f, colors = colors)
+            reduce -> drawLapisLogo(head = 1f, tail = 0f, tip = false, colors = colors)
+            else -> drawLapisLogo(head = up(t, 0f, 1400f), tail = up(t, 1250f, 2600f), tip = true, colors = colors)
         }
     }
 }
 
 /** The logo at rest. */
 @Composable
-fun LapisLogo(modifier: Modifier = Modifier, size: Dp = 96.dp) {
-    Canvas(modifier.size(size).semantics { contentDescription = "LapisServe" }) { drawLapisLogo(1f, 0f, false) }
+fun LapisLogo(modifier: Modifier = Modifier, size: Dp = 96.dp, colors: LogoColors = defaultLogoColors()) {
+    Canvas(modifier.size(size).semantics { contentDescription = "LapisServe" }) { drawLapisLogo(1f, 0f, false, colors = colors) }
 }
 
 /** Draws the logo once (about [durationMs]) and calls [onDone]; for the launch splash. */
 @Composable
-fun LapisIntro(modifier: Modifier = Modifier, size: Dp = 140.dp, durationMs: Int = 900, onDone: () -> Unit = {}) {
+fun LapisIntro(modifier: Modifier = Modifier, size: Dp = 140.dp, durationMs: Int = 900, colors: LogoColors = defaultLogoColors(), onDone: () -> Unit = {}) {
     val reduce = LocalAppearance.current.reduceMotion
     val p = remember { Animatable(if (reduce) 1f else 0f) }
     val flash = remember { Animatable(0f) }
@@ -80,7 +85,7 @@ fun LapisIntro(modifier: Modifier = Modifier, size: Dp = 140.dp, durationMs: Int
         onDone()
     }
     Canvas(modifier.size(size).semantics { contentDescription = "LapisServe" }) {
-        drawLapisLogo(head = p.value, tail = 0f, tip = p.value < 0.999f, flash = flash.value)
+        drawLapisLogo(head = p.value, tail = 0f, tip = p.value < 0.999f, flash = flash.value, colors = colors)
     }
 }
 
@@ -96,10 +101,48 @@ private val MID = Rect(862f, 1196f, 1693f, 1363f)
 private val RIGHT_V = Rect(1525f, 1196f, 1693f, 1731f)
 private val BOTTOM = Rect(20f, 1565f, 1693f, 1731f)
 
-private val GREEN = Color(0xFF60D959)
-private val LIME = Color(0xFFAFEA46)
-private val UPPER_TOP = Color(0xFF064584); private val UPPER_BOTTOM = Color(0xFF01133E)
-private val LOWER_TOP = Color(0xFF011236); private val LOWER_BOTTOM = Color(0xFF064383)
+/**
+ * Logo colours. [Original] is the artwork; [duo] is a two-tone version built from the app's colour scheme (so it follows the
+ * chosen accent and wallpaper colours): accent bars on accent-container blocks.
+ */
+@Immutable
+class LogoColors(
+    val barEdge: Color, val barMid: Color,
+    val upperTop: Color, val upperBottom: Color, val lowerTop: Color, val lowerBottom: Color,
+    val glow: Color,
+) {
+    companion object {
+        val Original = LogoColors(
+            barEdge = Color(0xFF60D959), barMid = Color(0xFFAFEA46),
+            upperTop = Color(0xFF064584), upperBottom = Color(0xFF01133E), lowerTop = Color(0xFF011236), lowerBottom = Color(0xFF064383),
+            glow = Color(0xFFEBFFC8),
+        )
+
+        fun duo(cs: ColorScheme, dark: Boolean): LogoColors = if (dark) {
+            val top = lerp(cs.primaryContainer, cs.primary, 0.12f); val bottom = lerp(cs.primaryContainer, Color.Black, 0.22f)
+            LogoColors(cs.primary, lerp(cs.primary, Color.White, 0.45f), top, bottom, bottom, top, Color.White)
+        } else {
+            val top = cs.primaryContainer; val bottom = lerp(cs.primaryContainer, cs.primary, 0.14f)
+            LogoColors(cs.primary, lerp(cs.primary, Color.White, 0.25f), top, bottom, bottom, top, Color.White)
+        }
+    }
+}
+
+/** Original artwork on dark themes; duo-chrome on light, where the navy blocks would feel heavy. */
+@Composable
+fun defaultLogoColors(): LogoColors {
+    val dark = LocalIsDark.current
+    val cs = MaterialTheme.colorScheme
+    return remember(dark, cs) { if (dark) LogoColors.Original else LogoColors.duo(cs, dark = false) }
+}
+
+/** Duo-chrome in the current theme; for empty states and other places the logo should match the accent. */
+@Composable
+fun duoLogoColors(): LogoColors {
+    val dark = LocalIsDark.current
+    val cs = MaterialTheme.colorScheme
+    return remember(dark, cs) { LogoColors.duo(cs, dark) }
+}
 
 private val Smooth: Easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 private fun up(t: Float, start: Float, end: Float, e: Easing = Smooth) = e.transform(((t - start) / (end - start)).coerceIn(0f, 1f))
@@ -116,14 +159,14 @@ private val SEGS = listOf(
 private val TOTAL = SEGS.sumOf { it.len.toDouble() }.toFloat()
 
 /** Draws the logo with the S visible between [tail] and [head] (fractions of the whole path). */
-fun DrawScope.drawLapisLogo(head: Float, tail: Float, tip: Boolean, flash: Float = 0f) {
+fun DrawScope.drawLapisLogo(head: Float, tail: Float, tip: Boolean, flash: Float = 0f, colors: LogoColors = LogoColors.Original) {
     val s = size.minDimension / UNIT
     withTransform({
         translate((size.width - UNIT * s) / 2f, (size.height - UNIT * s) / 2f)
         scale(s, s, Offset.Zero)
     }) {
-        block(UPPER, UPPER_TOP, UPPER_BOTTOM)
-        block(LOWER, LOWER_TOP, LOWER_BOTTOM)
+        block(UPPER, colors.upperTop, colors.upperBottom)
+        block(LOWER, colors.lowerTop, colors.lowerBottom)
         val a = tail.coerceIn(0f, 1f) * TOTAL
         val b = head.coerceIn(0f, 1f) * TOTAL
         var acc = 0f
@@ -146,11 +189,11 @@ fun DrawScope.drawLapisLogo(head: Float, tail: Float, tip: Boolean, flash: Float
                 if (hi == b) pen = Offset(r.center.x, y0)
                 Rect(r.left, y0, r.right, y1)
             }
-            bar(part, seg.vertical, flash)
+            bar(part, seg.vertical, flash, colors)
         }
         val p = pen
         if (tip && p != null && head < 1f) {
-            drawCircle(Brush.radialGradient(listOf(Color(0xE6EBFFC8), Color(0x00AFEA46)), p, 190f), 190f, p)
+            drawCircle(Brush.radialGradient(listOf(colors.glow.copy(alpha = 0.9f), colors.glow.copy(alpha = 0f)), p, 190f), 190f, p)
         }
     }
 }
@@ -158,10 +201,10 @@ fun DrawScope.drawLapisLogo(head: Float, tail: Float, tip: Boolean, flash: Float
 private fun DrawScope.block(r: Rect, top: Color, bottom: Color) =
     drawRoundRect(Brush.verticalGradient(listOf(top, bottom), r.top, r.bottom), r.topLeft, r.size, CornerRadius(64f, 64f))
 
-private fun DrawScope.bar(r: Rect, vertical: Boolean, flash: Float) {
+private fun DrawScope.bar(r: Rect, vertical: Boolean, flash: Float, c: LogoColors) {
     if (r.width < 1f || r.height < 1f) return
-    val brush = if (vertical) Brush.verticalGradient(listOf(GREEN, LIME, GREEN), r.top, r.bottom)
-        else Brush.horizontalGradient(listOf(GREEN, LIME, GREEN), r.left, r.right)
+    val stops = listOf(c.barEdge, c.barMid, c.barEdge)
+    val brush = if (vertical) Brush.verticalGradient(stops, r.top, r.bottom) else Brush.horizontalGradient(stops, r.left, r.right)
     drawRoundRect(brush, r.topLeft, Size(r.width, r.height), CornerRadius(10f, 10f))
     if (flash > 0f) drawRoundRect(Color.White, r.topLeft, Size(r.width, r.height), CornerRadius(10f, 10f), alpha = 0.45f * flash)
 }

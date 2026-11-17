@@ -71,9 +71,7 @@ fun ActivityScreen(manager: ServerManager, onOpen: (String) -> Unit) {
         }
         if (events.isEmpty()) item {
             Column(Modifier.fillMaxWidth().padding(top = 60.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(110.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(cs.primary.copy(alpha = .16f)), Alignment.Center) {
-                    Icon(Icons.Rounded.NotificationsNone, null, Modifier.size(52.dp), tint = cs.primary)
-                }
+                com.lapisserve.app.ui.components.LapisLogo(size = 104.dp, colors = com.lapisserve.app.ui.components.duoLogoColors())
                 Text("Nothing yet", style = MaterialTheme.typography.headlineSmall)
                 Text("Starts, stops, crashes and players joining will show up here.", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
             }

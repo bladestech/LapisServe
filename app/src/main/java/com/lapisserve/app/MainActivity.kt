@@ -26,6 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lapisserve.app.ui.components.LapisIntro
+import com.lapisserve.app.ui.components.LogoColors
+import com.lapisserve.app.ui.components.duoLogoColors
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.res.colorResource
 import com.lapisserve.app.ui.nav.AppShell
 import com.lapisserve.app.ui.theme.LapisTheme
 
@@ -45,8 +49,11 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize()) {
                     AppShell(app.manager, app.prefs)
                     AnimatedVisibility(intro, enter = EnterTransition.None, exit = fadeOut(tween(280))) {
-                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), Alignment.Center) {
-                            LapisIntro(size = 148.dp, durationMs = 800) { intro = false }
+                        // Match Android's own splash (which follows the system theme, not the in-app one) so the
+                        // handoff is seamless, then fade into the app in whatever theme it uses.
+                        val systemDark = isSystemInDarkTheme()
+                        Box(Modifier.fillMaxSize().background(colorResource(R.color.splash_background)), Alignment.Center) {
+                            LapisIntro(size = 148.dp, durationMs = 800, colors = if (systemDark) LogoColors.Original else duoLogoColors()) { intro = false }
                         }
                     }
                 }

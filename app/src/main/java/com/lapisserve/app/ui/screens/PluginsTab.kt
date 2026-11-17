@@ -85,7 +85,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
 
         if (mode == 0) {
             if (installed.isEmpty()) Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(Icons.Rounded.Extension, null, Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
+                com.lapisserve.app.ui.components.LapisLogo(size = 88.dp, colors = com.lapisserve.app.ui.components.duoLogoColors())
                 Spacer(Modifier.height(12.dp))
                 Text("No plugins yet", style = MaterialTheme.typography.titleMedium)
                 Text("Browse Modrinth to add permissions, economy, world protection and more in one tap.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

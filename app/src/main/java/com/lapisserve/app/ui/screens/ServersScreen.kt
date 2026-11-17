@@ -128,9 +128,7 @@ private fun DeviceStrip(mem: com.lapisserve.app.system.MemorySnapshot, dev: com.
 private fun EmptyState(onCreate: () -> Unit, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     Column(modifier.fillMaxWidth().padding(vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(140.dp).clip(MaterialShapes.Cookie12Sided.toShape()).background(cs.primary.copy(alpha = .18f)), Alignment.Center) {
-            Icon(Icons.Rounded.Dns, null, Modifier.size(64.dp), tint = cs.primary)
-        }
+        com.lapisserve.app.ui.components.LapisIntro(size = 150.dp, durationMs = 1000, colors = com.lapisserve.app.ui.components.duoLogoColors())
         Spacer(Modifier.height(8.dp))
         Text("No servers yet", style = MaterialTheme.typography.headlineSmall)
         Text("Pick Vanilla, Paper, Purpur or Pumpkin. LapisServe downloads everything it needs from the official sources.",
