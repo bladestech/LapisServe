@@ -118,8 +118,9 @@ class ServerManager(private val app: Context) {
         persist()
     }
 
-    fun create(type: ServerType, version: String, name: String, ramMb: Int): ServerConfig {
-        val c = ServerConfig(
+    /** Creates a server; [customize] applies the choices made on the create screen on top of the defaults. */
+    fun create(type: ServerType, version: String, name: String, ramMb: Int, customize: (ServerConfig) -> ServerConfig = { it }): ServerConfig {
+        val base = ServerConfig(
             id = UUID.randomUUID().toString().take(8), name = name.ifBlank { "${type.label} server" },
             type = type, version = version, ramMb = ramMb,
             gc = GcPreset.AUTO,
@@ -127,6 +128,7 @@ class ServerManager(private val app: Context) {
             viewDistance = if (type == ServerType.PUMPKIN) 10 else 6,
             simulationDistance = if (type == ServerType.PUMPKIN) 8 else 4,
         )
+        val c = customize(base).copy(id = base.id)
         _servers.update { it + c }; persist()
         return c
     }

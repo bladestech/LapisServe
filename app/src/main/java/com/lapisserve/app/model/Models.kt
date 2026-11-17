@@ -30,6 +30,25 @@ enum class CpuPriority(val label: String, val nice: Int) {
     BACKGROUND("Background", 10),
 }
 
+/** "How many players?" on the create screen: sets player cap, world distances and a RAM suggestion together. */
+enum class PlayerSize(val label: String, val range: String, val maxPlayers: Int, val viewDistance: Int, val simulationDistance: Int) {
+    FEW("Friends", "1-3", 4, 7, 5),
+    GROUP("Group", "4-8", 8, 6, 4),
+    MANY("Community", "9+", 20, 5, 4);
+
+    /** Suggested heap for this size, kept within the phone's comfortable range and snapped to 128 MB. */
+    fun recommendedRamMb(type: ServerType, comfortMb: Int): Int {
+        val want = if (type == ServerType.PUMPKIN) when (this) { FEW -> 512; GROUP -> 1024; MANY -> 1536 }
+        else when (this) {
+            FEW -> if (type == ServerType.VANILLA) 1536 else 2048
+            GROUP -> 3072
+            MANY -> 4096
+        }
+        val floor = if (type == ServerType.PUMPKIN) 256 else 1024
+        return (want.coerceAtMost(comfortMb).coerceAtLeast(floor) / 128) * 128
+    }
+}
+
 enum class CoreStrategy(val label: String, val blurb: String) {
     AUTO("Automatic", "Picks the best layout for this phone and server type."),
     FOCUS("Tick focus", "Performance cores only, with the fastest core kept for the main tick thread."),

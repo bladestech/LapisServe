@@ -95,6 +95,14 @@ class CoreTopologyTest {
         assertEquals("plain", com.lapisserve.app.engine.ConsoleParsers.stripAnsi("plain"))
     }
 
+    @Test fun playerSizeRam_isCappedByComfortAndSnapped() {
+        val ps = com.lapisserve.app.model.PlayerSize.entries
+        assertEquals(2048, ps[0].recommendedRamMb(ServerType.PAPER, 4000))
+        assertEquals(3968, ps[2].recommendedRamMb(ServerType.PAPER, 4000))      // 4096 capped to comfort, snapped to 128
+        assertEquals(1024, ps[2].recommendedRamMb(ServerType.PAPER, 600))       // never below a Java server's floor
+        assertEquals(512, ps[0].recommendedRamMb(ServerType.PUMPKIN, 4000))
+    }
+
     @Test fun describe() {
         assertEquals("cpu4-6", CoreTopology.describe(0b0111_0000, 8))
         assertEquals("cpu0,7", CoreTopology.describe(0b1000_0001, 8))
