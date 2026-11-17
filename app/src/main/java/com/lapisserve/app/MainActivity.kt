@@ -8,9 +8,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.lapisserve.app.ui.components.LapisIntro
 import com.lapisserve.app.ui.nav.AppShell
 import com.lapisserve.app.ui.theme.LapisTheme
 
@@ -19,12 +34,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = LapisApp.get(this)
+        val coldStart = savedInstanceState == null
         setContent {
             val appearance by app.prefs.appearance.collectAsState()
             LapisTheme(appearance) {
                 val notif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
                 LaunchedEffect(Unit) { if (Build.VERSION.SDK_INT >= 33) notif.launch(Manifest.permission.POST_NOTIFICATIONS) }
-                AppShell(app.manager, app.prefs)
+                // The app loads underneath while the logo draws itself once; only on a cold start, not on rotation.
+                var intro by rememberSaveable { mutableStateOf(coldStart) }
+                Box(Modifier.fillMaxSize()) {
+                    AppShell(app.manager, app.prefs)
+                    AnimatedVisibility(intro, enter = EnterTransition.None, exit = fadeOut(tween(280))) {
+                        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), Alignment.Center) {
+                            LapisIntro(size = 148.dp, durationMs = 800) { intro = false }
+                        }
+                    }
+                }
             }
         }
     }

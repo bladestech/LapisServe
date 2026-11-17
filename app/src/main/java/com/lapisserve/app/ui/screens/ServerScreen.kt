@@ -250,7 +250,7 @@ private fun OverviewTab(
             item {
                 GlassCard(Modifier.staggerIn(n++), shape = MaterialTheme.shapes.large, tint = cs.primary) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LapisLoader(size = 56.dp)
+                        LapisLoader(size = 56.dp, progress = p.fraction)
                         Column { Text(p.label, style = MaterialTheme.typography.titleMedium); if (p.detail.isNotEmpty()) Text(p.detail, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant) }
                     }
                     Spacer(Modifier.height(12.dp))

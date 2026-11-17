@@ -3,6 +3,9 @@
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowSplashScreenBackground">#0B1B2B</item>
+        <!-- Android 12+ shows its own splash first. Keep it to the app's background colour with no icon,
+             so it hands straight over to the in-app logo that draws itself. -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_empty</item>
     </style>
 </resources>
