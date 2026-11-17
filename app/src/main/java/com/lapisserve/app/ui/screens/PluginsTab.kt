@@ -32,6 +32,7 @@ import com.lapisserve.app.modrinth.MrProject
 import com.lapisserve.app.modrinth.PluginStore
 import com.lapisserve.app.ui.components.BannerKind
 import com.lapisserve.app.ui.components.InfoBanner
+import com.lapisserve.app.ui.components.LapisLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -118,7 +119,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
                 )
                 Text(if (query.isBlank()) "Most downloaded" else "Results", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 when {
-                    loading && results.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { LoadingIndicator() }
+                    loading && results.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) { LapisLoader(size = 120.dp) }
                     error != null -> Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         InfoBanner(error!!, Icons.Rounded.CloudOff, BannerKind.ERROR, title = "Couldn't load plugins")
                         OutlinedButton({ attempt++ }) { Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(8.dp)); Text("Try again") }
