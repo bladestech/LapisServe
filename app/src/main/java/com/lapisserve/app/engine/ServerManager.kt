@@ -8,6 +8,7 @@ import android.system.Os
 import com.lapisserve.app.core.Arch
 import com.lapisserve.app.core.Http
 import com.lapisserve.app.core.humanBytes
+import com.lapisserve.app.core.sizeRecursive
 import com.lapisserve.app.model.*
 import com.lapisserve.app.providers.Providers
 import com.lapisserve.app.runtime.JavaRuntime
@@ -21,6 +22,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.OutputStreamWriter
+import java.text.SimpleDateFormat
+import java.util.Collections
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -46,6 +51,49 @@ class ServerManager(private val app: Context) {
         val stdin = OutputStreamWriter(process.outputStream)
         @Volatile var stopRequested = false
     }
+    private val _events = MutableStateFlow<List<ServerEvent>>(emptyList())
+    val events: StateFlow<List<ServerEvent>> = _events.asStateFlow()
+    private val eventSeq = AtomicLong()
+    private val tracked = ConcurrentHashMap<String, MutableSet<String>>()     // players seen joining, per server
+    private val pollWindow = ConcurrentHashMap<String, Long>()                // swallow our own tps/tick output until this time
+
+    fun postEvent(serverId: String, kind: ServerEvent.Kind, text: String) {
+        val name = config(serverId)?.name ?: serverId
+        if (kind == ServerEvent.Kind.CRASHED) com.lapisserve.app.service.Alerts.crashed(app, name, text)
+        _events.update { (listOf(ServerEvent(eventSeq.incrementAndGet(), System.currentTimeMillis(), serverId, name, kind, text)) + it).take(300) }
+    }
+
+    // ------------------------------------------------------------------ backups
+
+    private fun backupDir(id: String) = File(app.filesDir, "backups/$id")
+    fun listBackups(id: String): List<Backup> = Backups.list(backupDir(id))
+    fun deleteBackup(b: Backup) { b.file.delete() }
+
+    /** Zips worlds and member lists. On a running server it asks the world to flush to disk first. */
+    suspend fun createBackup(id: String): Backup = withContext(Dispatchers.IO) {
+        val c = config(id) ?: error("Unknown server")
+        val l = live[id]
+        if (l != null && c.type.isJava) {
+            runCatching { l.stdin.write("save-off\n"); l.stdin.write("save-all flush\n"); l.stdin.flush() }
+            delay(3500)
+        }
+        try {
+            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+            val dest = File(backupDir(id), "${c.name.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.ifEmpty { "server" }}-$stamp.zip")
+            val size = Backups.create(dir(id), dest)
+            postEvent(id, ServerEvent.Kind.INFO, "Backup saved (${size.humanBytes()})")
+            Backup(dest, size, dest.lastModified())
+        } finally {
+            if (l != null && c.type.isJava) runCatching { l.stdin.write("save-on\n"); l.stdin.flush() }
+        }
+    }
+
+    suspend fun restoreBackup(id: String, b: Backup) = withContext(Dispatchers.IO) {
+        check(!isActive(id)) { "Stop the server before restoring a backup" }
+        Backups.restore(b.file, dir(id))
+        postEvent(id, ServerEvent.Kind.INFO, "Restored backup ${b.name}")
+    }
+
     private val live = ConcurrentHashMap<String, Live>()
     private val jobs = ConcurrentHashMap<String, Job>()
     private val restarts = ConcurrentHashMap<String, Int>()
@@ -87,6 +135,7 @@ class ServerManager(private val app: Context) {
         _servers.update { l -> l.filterNot { it.id == id } }; persist()
         _states.update { it - id }; logs.remove(id)
         File(root, id).deleteRecursively()
+        File(app.filesDir, "backups/$id").deleteRecursively()
     }
 
     // ------------------------------------------------------------------ logs
@@ -261,23 +310,28 @@ class ServerManager(private val app: Context) {
 
             val allowed = LaunchBuilder.effectiveCores(c, cores)
             val metrics = scope.launch { metricsLoop(id, l, pid, allowed) }
+            val vitals = scope.launch { vitalsLoop(id, l, allowed) }
             val dnsRefresh = if (c.type.isJava) scope.launch { while (isActive) { delay(5 * 60_000L); runCatching { DnsHosts.write(hostsFile, config(id)?.extraHosts ?: "") } } } else null
             val readyRegex = if (c.type.isJava) Regex("""Done \(.*\)! For help""") else Regex("""(?i)(done|started|listening|ready)""")
             val fallbackReady = if (!c.type.isJava) scope.launch { delay(20_000); markRunning(id) } else null
             withContext(Dispatchers.IO) {
                 proc.inputStream.bufferedReader().forEachLine { line ->
-                    log(id, line, classify(line))
+                    val ours = System.currentTimeMillis() < (pollWindow[id] ?: 0L) && ConsoleParsers.isPollingOutput(line)
+                    if (!ours) log(id, line, classify(line))
                     if (readyRegex.containsMatchIn(line)) markRunning(id)
+                    ingest(id, line)
                 }
             }
             val code = withContext(Dispatchers.IO) { proc.waitFor() }
-            fallbackReady?.cancel(); metrics.cancel(); dnsRefresh?.cancel()
+            fallbackReady?.cancel(); metrics.cancel(); vitals.cancel(); dnsRefresh?.cancel(); tracked.remove(id); pollWindow.remove(id)
             live.remove(id)
             if (l.stopRequested || code == 0) {
                 log(id, "-- server stopped (exit $code) --", LogLine.Kind.SYSTEM)
+                postEvent(id, ServerEvent.Kind.STOPPED, "Stopped")
                 setState(id) { ServerRuntime() }
             } else {
                 log(id, "-- server exited unexpectedly (exit $code) --", LogLine.Kind.ERROR)
+                postEvent(id, ServerEvent.Kind.CRASHED, "Stopped unexpectedly (exit $code)")
                 setState(id) { ServerRuntime(state = RunState.CRASHED, message = "Exited with code $code" + hint(code)) }
                 val n = restarts.merge(id, 1, Int::plus) ?: 1
                 if (c.autoRestartOnCrash && n <= 3) {
@@ -313,7 +367,71 @@ class ServerManager(private val app: Context) {
         drain.cancel()
     }
 
-    private fun markRunning(id: String) = setState(id) { if (it.state == RunState.STARTING) it.copy(state = RunState.RUNNING) else it }
+    private fun markRunning(id: String) {
+        var became = false
+        setState(id) { if (it.state == RunState.STARTING) { became = true; it.copy(state = RunState.RUNNING) } else it }
+        if (became) postEvent(id, ServerEvent.Kind.STARTED, "Running and ready for players")
+    }
+
+    /** Looks at every console line for the things owners care about: TPS, tick time, joins and leaves. */
+    private fun ingest(id: String, line: String) {
+        ConsoleParsers.parseTps(line)?.let { (t1, t5, t15) -> setState(id) { it.copy(tps = t1, tps5m = t5, tps15m = t15) } }
+        ConsoleParsers.parseTickQuery(line)?.let { ms -> setState(id) { it.copy(mspt = ms, tps = ConsoleParsers.tpsFromMspt(ms)) } }
+        if (System.currentTimeMillis() < (pollWindow[id] ?: 0L)) ConsoleParsers.parseMspt(line)?.let { ms ->
+            if (ms < 1000f) setState(id) { it.copy(mspt = ms) }
+        }
+        ConsoleParsers.parsePlayerEvent(line)?.let { e ->
+            val set = tracked.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }
+            if (e.presence == ConsoleParsers.Presence.JOINED) { set += e.name; postEvent(id, ServerEvent.Kind.JOIN, "${e.name} joined") }
+            else { set -= e.name; postEvent(id, ServerEvent.Kind.LEAVE, "${e.name} left") }
+            setState(id) { it.copy(players = set.toList().sorted(), playersOnline = maxOf(set.size, 0)) }
+        }
+    }
+
+    /**
+     * Every few seconds while the server is up: ping it on localhost for players/latency, ask it for TPS where it
+     * has a command for that, and add a sample to the chart histories.
+     */
+    private suspend fun vitalsLoop(id: String, l: Live, allowedCores: Int) {
+        var tick = 0
+        while (currentCoroutineContext().isActive) {
+            delay(5000)
+            val c = config(id) ?: continue
+            if (runtime(id).state != RunState.RUNNING) continue
+            tick++
+            val r = withContext(Dispatchers.IO) { Slp.query("127.0.0.1", c.port) }
+            if (r != null) {
+                val set = tracked.getOrPut(id) { Collections.newSetFromMap(ConcurrentHashMap()) }
+                if (r.online == 0) set.clear() else if (r.sample.isNotEmpty() && r.sample.size >= r.online) { set.clear(); set += r.sample }
+                setState(id) { it.copy(playersOnline = r.online, playersMax = r.max, pingMs = r.latencyMs, versionSeen = r.versionName, players = set.toList().sorted()) }
+            }
+            // Ask the server for tick health. Its reply is swallowed from the console but parsed above.
+            val cmd = when { c.type.supportsPlugins -> "tps"; c.type == ServerType.VANILLA -> "tick query"; else -> null }
+            if (cmd != null) {
+                pollWindow[id] = System.currentTimeMillis() + 2500
+                withContext(Dispatchers.IO) { runCatching { l.stdin.write(cmd + "\n"); l.stdin.flush() } }
+                if (c.type.supportsPlugins && tick % 2 == 0) {
+                    delay(300)
+                    pollWindow[id] = System.currentTimeMillis() + 2500
+                    withContext(Dispatchers.IO) { runCatching { l.stdin.write("mspt\n"); l.stdin.flush() } }
+                }
+            }
+            val world = if (tick % 6 == 1) withContext(Dispatchers.IO) { worldSize(dir(id)) } else null
+            setState(id) { r0 ->
+                fun <T> List<T>.pushed(v: T) = (this + v).takeLast(72)
+                r0.copy(
+                    worldBytes = world ?: r0.worldBytes,
+                    tpsHistory = r0.tps?.let { r0.tpsHistory.pushed(it) } ?: r0.tpsHistory,
+                    cpuHistory = r0.cpuHistory.pushed((r0.cpuCoresUsed / allowedCores.coerceAtLeast(1)).coerceIn(0f, 1f)),
+                    ramHistory = r0.ramHistory.pushed(if (c.ramMb > 0) (r0.rssMb.toFloat() / c.ramMb).coerceIn(0f, 1.2f) else 0f),
+                    playerHistory = r0.playerHistory.pushed(r0.playersOnline.toFloat()),
+                )
+            }
+        }
+    }
+
+    private fun worldSize(d: File): Long =
+        d.listFiles { f -> f.isDirectory && (f.name.startsWith("world") || f.name == "DIM-1" || f.name == "DIM1") }.orEmpty().sumOf { it.sizeRecursive() }
 
     private suspend fun metricsLoop(id: String, l: Live, pid: Long, allowedCores: Int) {
         val hz = runCatching { Os.sysconf(android.system.OsConstants._SC_CLK_TCK) }.getOrDefault(100L).coerceAtLeast(1L)

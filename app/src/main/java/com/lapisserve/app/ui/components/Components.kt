@@ -76,12 +76,13 @@ fun StatePill(state: RunState, modifier: Modifier = Modifier) {
         RunState.CRASHED -> Triple(cs.errorContainer, cs.onErrorContainer, "Crashed")
         RunState.STOPPED -> Triple(cs.surfaceContainerHighest, cs.onSurfaceVariant, "Offline")
     }
+    val active = state == RunState.RUNNING || state == RunState.STARTING || state == RunState.INSTALLING
     Row(
-        modifier.clip(CircleShape).background(bg).padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier.clip(CircleShape).background(bg.copy(alpha = .72f)).padding(start = 8.dp, end = 14.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(fg))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = fg)
+        com.lapisserve.app.ui.glass.PulseDot(fg, active, size = 7.dp)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
     }
 }
 
@@ -89,14 +90,11 @@ fun StatePill(state: RunState, modifier: Modifier = Modifier) {
 
 @Composable
 fun SettingsCard(title: String, icon: ImageVector, modifier: Modifier = Modifier, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    com.lapisserve.app.ui.glass.GlassCard(modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Box(Modifier.size(40.dp).clip(MaterialShapes.Cookie6Sided.toShape()).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-                    Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(22.dp))
+                Box(Modifier.size(40.dp).clip(MaterialShapes.Cookie6Sided.toShape()).background(MaterialTheme.colorScheme.primary.copy(alpha = .20f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 }
                 Column {
                     Text(title, style = MaterialTheme.typography.titleLarge)
@@ -111,7 +109,7 @@ fun SettingsCard(title: String, icon: ImageVector, modifier: Modifier = Modifier
 @Composable
 fun SwitchRow(title: String, desc: String?, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
     Row(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(enabled) { onChange(!checked) }.padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().clickable(enabled) { onChange(!checked) }.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(Modifier.weight(1f)) {
@@ -261,18 +259,20 @@ fun RamSlider(valueMb: Int, onChange: (Int) -> Unit, mem: MemorySnapshot, modifi
                 Canvas(Modifier.fillMaxWidth().height(40.dp)) {
                     val h = 22.dp.toPx(); val top = (size.height - h) / 2; val r = CornerRadius(h / 2)
                     val w = size.width
-                    fun seg(a: Float, b: Float, c: Color, alpha: Float) {
+                    val gap = 3.dp.toPx()
+                    // zone boundaries get a small gap; the outer ends and the filled edge stay flush
+                    fun seg(a: Float, b: Float, c: Color, alpha: Float, gapStart: Boolean = a > 0f, gapEnd: Boolean = b < 1f) {
                         if (b <= a) return
-                        drawRoundRect(c.copy(alpha = alpha), Offset(w * a, top), Size(w * (b - a), h), r)
+                        val x0 = w * a + if (gapStart) gap / 2 else 0f
+                        val x1 = w * b - if (gapEnd) gap / 2 else 0f
+                        if (x1 > x0) drawRoundRect(c.copy(alpha = alpha), Offset(x0, top), Size(x1 - x0, h), r)
                     }
                     // tinted zones behind
                     seg(0f, comfort, trackGood, .16f); seg(comfort, risky, trackWarn, .20f); seg(risky, 1f, trackBad, .24f)
                     // filled part, coloured by whichever zone each portion falls in
-                    seg(0f, minOf(progress, comfort), trackGood, 1f)
-                    if (progress > comfort) seg(comfort, minOf(progress, risky), trackWarn, 1f)
-                    if (progress > risky) seg(risky, progress, trackBad, 1f)
-                    // gaps between zones so they read as a segmented bar
-                    for (g in listOf(comfort, risky)) drawRect(cs.surfaceContainerLow, Offset(w * g - 1.5.dp.toPx(), top), Size(3.dp.toPx(), h))
+                    seg(0f, minOf(progress, comfort), trackGood, 1f, gapStart = false, gapEnd = progress > comfort)
+                    if (progress > comfort) seg(comfort, minOf(progress, risky), trackWarn, 1f, gapStart = true, gapEnd = progress > risky)
+                    if (progress > risky) seg(risky, progress, trackBad, 1f, gapStart = true, gapEnd = false)
                     // marker: RAM already used by the system and other apps
                     val ux = w * usedFrac
                     drawRect(cs.onSurface.copy(alpha = .75f), Offset(ux - 1.dp.toPx(), top - 5.dp.toPx()), Size(2.dp.toPx(), h + 10.dp.toPx()))

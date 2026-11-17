@@ -89,7 +89,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
                 Text("Browse Modrinth to add permissions, economy, world protection and more in one tap.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(16.dp))
                 Button({ mode = 1 }) { Icon(Icons.Rounded.Search, null); Spacer(Modifier.width(8.dp)); Text("Browse Modrinth") }
-            } else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            } else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(installed, key = { it.file.name }) { p -> InstalledRow(p,
                     onToggle = { store.setEnabled(p, it); changed = true; refresh++ },
                     onDelete = { store.remove(p); changed = true; refresh++; notify("Removed ${p.name}") }) }
@@ -122,7 +122,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
                         OutlinedButton({ attempt++ }) { Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(8.dp)); Text("Try again") }
                     }
                     results.isEmpty() -> Text("Nothing found for this Minecraft version. Try a different search.", Modifier.padding(20.dp), style = MaterialTheme.typography.bodyMedium)
-                    else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(results, key = { it.id }) { p ->
                             ResultCard(p, installed = p.id in tracked, status = working[p.id]) {
                                 scope.launch {
@@ -144,8 +144,8 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
 @Composable
 private fun InstalledRow(p: InstalledPlugin, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    com.lapisserve.app.ui.glass.GlassCard(shape = MaterialTheme.shapes.large, padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Rounded.Extension, null, tint = if (p.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -165,8 +165,8 @@ private fun InstalledRow(p: InstalledPlugin, onToggle: (Boolean) -> Unit, onDele
 
 @Composable
 private fun ResultCard(p: MrProject, installed: Boolean, status: String?, onInstall: () -> Unit) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+    com.lapisserve.app.ui.glass.GlassCard(shape = MaterialTheme.shapes.large, padding = PaddingValues(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
             RemoteIcon(p.iconUrl)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(p.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
