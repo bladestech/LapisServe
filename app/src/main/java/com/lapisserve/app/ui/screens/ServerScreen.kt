@@ -52,6 +52,7 @@ fun ServerScreen(manager: ServerManager, id: String, startTab: String, onBack: (
     var eula by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmKill by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -98,7 +99,9 @@ fun ServerScreen(manager: ServerManager, id: String, startTab: String, onBack: (
                 },
             ) { t ->
                 when (t) {
-                    "Overview" -> OverviewTab(manager, cfg, rt, active, toggle, notify, onSettings = { tab = "Settings" }, onTuning = onTuning, onPlayers = { tab = "Players" })
+                    "Overview" -> OverviewTab(manager, cfg, rt, active, toggle, notify, onSettings = { tab = "Settings" }, onTuning = onTuning, onPlayers = { tab = "Players" },
+                        onRestart = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); manager.restart(id); notify("Restarting ${cfg.name}…") },
+                        onKill = { confirmKill = true })
                     "Console" -> Box(Modifier.padding(bottom = if (imeVisible) 0.dp else BottomBarSpace - 14.dp)) { ConsoleTab(manager, cfg, rt, notify) }
                     "Players" -> PlayersTab(manager, cfg, rt, notify)
                     "Plugins" -> PluginsTab(manager, cfg, active, notify)
@@ -121,6 +124,12 @@ fun ServerScreen(manager: ServerManager, id: String, startTab: String, onBack: (
         confirmButton = { Button({ eula = false; manager.update(cfg.copy(acceptEula = true)); manager.start(id) }) { Text("I agree · Start") } },
         dismissButton = { TextButton({ eula = false }) { Text("Cancel") } },
     )
+    if (confirmKill) AlertDialog(
+        onDismissRequest = { confirmKill = false }, icon = { Icon(Icons.Rounded.Dangerous, null) }, title = { Text("Force stop ${cfg.name}?") },
+        text = { Text("This kills the server immediately without saving. Anything since the last autosave can be lost, and a world that is mid-save could be damaged. Use it only if the server is stuck. A normal Stop is much safer.") },
+        confirmButton = { Button({ confirmKill = false; haptic.performHapticFeedback(HapticFeedbackType.LongPress); manager.forceStop(id); notify("Force stopped ${cfg.name}") }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Force stop") } },
+        dismissButton = { TextButton({ confirmKill = false }) { Text("Keep running") } },
+    )
     if (confirmDelete) AlertDialog(
         onDismissRequest = { confirmDelete = false }, icon = { Icon(Icons.Rounded.DeleteForever, null) }, title = { Text("Delete ${cfg.name}?") },
         text = { Text("This permanently deletes the server, its worlds and all files. This cannot be undone.") },
@@ -142,7 +151,7 @@ private fun typeTint(type: ServerType): androidx.compose.ui.graphics.Color = whe
 @Composable
 private fun OverviewTab(
     manager: ServerManager, cfg: ServerConfig, rt: ServerRuntime, active: Boolean, onToggle: () -> Unit,
-    notify: (String) -> Unit, onSettings: () -> Unit, onTuning: () -> Unit, onPlayers: () -> Unit,
+    notify: (String) -> Unit, onSettings: () -> Unit, onTuning: () -> Unit, onPlayers: () -> Unit, onRestart: () -> Unit, onKill: () -> Unit,
 ) {
     val ctx = LocalContext.current
     val clip = LocalClipboardManager.current
@@ -165,7 +174,7 @@ private fun OverviewTab(
         item {
             GlassCard(Modifier.staggerIn(n++), shape = MaterialTheme.shapes.extraLarge, tint = typeTint(cfg.type)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    TypeAvatar(cfg.type, 76.dp, Modifier.sharedAvatar(cfg.id))
+                    StateAura(rt.state, Modifier.size(76.dp)) { TypeAvatar(cfg.type, 76.dp, Modifier.sharedAvatar(cfg.id)) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("${cfg.type.label} ${cfg.displayVersion}", style = MaterialTheme.typography.titleLarge, maxLines = 1)
                         StatePill(rt.state)
@@ -173,14 +182,48 @@ private fun OverviewTab(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                val busy = rt.state == RunState.STOPPING
-                Button(
-                    onClick = onToggle, enabled = !busy, modifier = Modifier.fillMaxWidth().height(58.dp),
-                    colors = if (active) ButtonDefaults.buttonColors(containerColor = cs.errorContainer, contentColor = cs.onErrorContainer) else ButtonDefaults.buttonColors(),
-                ) {
-                    Icon(if (active) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(10.dp))
-                    Text(if (rt.state == RunState.INSTALLING) "Cancel setup" else if (active) "Stop server" else "Start server", style = MaterialTheme.typography.titleMedium)
+                val stopping = rt.state == RunState.STOPPING
+                val container by animateColorAsState(if (active) cs.errorContainer else cs.primary, tween(350), label = "btnBg")
+                val onContainer by animateColorAsState(if (active) cs.onErrorContainer else cs.onPrimary, tween(350), label = "btnFg")
+                val canRestart = rt.state == RunState.RUNNING || rt.state == RunState.STARTING
+                val canKill = canRestart || stopping
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = onToggle, enabled = !stopping, modifier = Modifier.weight(1f).height(58.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = onContainer, disabledContainerColor = container.copy(alpha = .6f), disabledContentColor = onContainer),
+                    ) {
+                        AnimatedContent(
+                            (rt.state == RunState.INSTALLING) to (if (stopping) 2 else if (active) 1 else 0), label = "btnLabel",
+                            transitionSpec = { (slideInVertically(spring(0.8f, 500f)) { it / 2 } + fadeIn(tween(180))) togetherWith (slideOutVertically(tween(160)) { -it / 2 } + fadeOut(tween(120))) },
+                        ) { (setup, mode) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (mode == 2) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = onContainer)
+                                else Icon(if (mode == 1) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null)
+                                Spacer(Modifier.width(10.dp))
+                                Text(if (mode == 2) "Stopping…" else if (setup) "Cancel setup" else if (mode == 1) "Stop" else "Start server", style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                            }
+                        }
+                    }
+                    AnimatedVisibility(
+                        canKill, enter = expandHorizontally(spring(0.7f, 420f)) + fadeIn(tween(200)) + scaleIn(spring(0.6f, 420f), initialScale = .6f),
+                        exit = shrinkHorizontally(tween(180)) + fadeOut(tween(120)) + scaleOut(targetScale = .6f),
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            FilledTonalIconButton(onRestart, Modifier.size(58.dp), enabled = canRestart) { Icon(Icons.Rounded.RestartAlt, "Restart server", Modifier.size(26.dp)) }
+                            FilledIconButton(
+                                onKill, Modifier.size(58.dp),
+                                colors = IconButtonDefaults.filledIconButtonColors(containerColor = cs.error.copy(alpha = .85f), contentColor = cs.onError),
+                            ) { Icon(Icons.Rounded.Dangerous, "Force stop (kill)", Modifier.size(26.dp)) }
+                        }
+                    }
+                }
+                AnimatedVisibility(stopping) {
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        Text("Saving the world and shutting down. If it takes too long, use the red button to force stop.", style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                    }
                 }
                 AnimatedVisibility(running && ips.isNotEmpty()) {
                     Column {

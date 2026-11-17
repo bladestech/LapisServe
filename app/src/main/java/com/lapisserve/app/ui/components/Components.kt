@@ -77,12 +77,17 @@ fun StatePill(state: RunState, modifier: Modifier = Modifier) {
         RunState.STOPPED -> Triple(cs.surfaceContainerHighest, cs.onSurfaceVariant, "Offline")
     }
     val active = state == RunState.RUNNING || state == RunState.STARTING || state == RunState.INSTALLING
+    val bgA by androidx.compose.animation.animateColorAsState(bg.copy(alpha = .72f), androidx.compose.animation.core.tween(350), label = "pillBg")
+    val fgA by androidx.compose.animation.animateColorAsState(fg, androidx.compose.animation.core.tween(350), label = "pillFg")
     Row(
-        modifier.clip(CircleShape).background(bg.copy(alpha = .72f)).padding(start = 8.dp, end = 14.dp, top = 2.dp, bottom = 2.dp),
+        modifier.clip(CircleShape).background(bgA).padding(start = 8.dp, end = 14.dp, top = 2.dp, bottom = 2.dp).animateContentSize(),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        com.lapisserve.app.ui.glass.PulseDot(fg, active, size = 7.dp)
-        Text(label, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
+        com.lapisserve.app.ui.glass.PulseDot(fgA, active, size = 7.dp)
+        AnimatedContent(
+            label, label = "pillText",
+            transitionSpec = { (slideInVertically { it / 2 } + fadeIn(androidx.compose.animation.core.tween(200))) togetherWith (slideOutVertically { -it / 2 } + fadeOut(androidx.compose.animation.core.tween(120))) },
+        ) { l -> Text(l, style = MaterialTheme.typography.labelLarge, color = fgA, maxLines = 1) }
     }
 }
 

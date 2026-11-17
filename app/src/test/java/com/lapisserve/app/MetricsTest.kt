@@ -96,6 +96,17 @@ class MetricsTest {
         assertTrue(r.latencyMs >= 0)
     }
 
+    @Test fun processOutput_closedUnderTheReaderEndsQuietly() {
+        // Reproduces force stop: Android closes the pipe while a read is blocked and throws InterruptedIOException.
+        val stream = object : java.io.InputStream() {
+            private val data = "one\ntwo\n".toByteArray(); private var i = 0
+            override fun read(): Int = if (i < data.size) data[i++].toInt() else throw java.io.InterruptedIOException("read interrupted by close() on another thread")
+        }
+        val lines = ArrayList<String>()
+        com.lapisserve.app.engine.forEachLineSafely(stream) { lines += it }   // must not throw
+        assertEquals(listOf("one", "two"), lines)
+    }
+
     @Test fun slpQuery_returnsNullWhenNothingListening() {
         val free = ServerSocket(0).use { it.localPort }
         assertNull(Slp.query("127.0.0.1", free, 300))

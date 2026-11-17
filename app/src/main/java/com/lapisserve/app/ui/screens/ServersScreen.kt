@@ -2,7 +2,10 @@
 
 package com.lapisserve.app.ui.screens
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,9 +56,11 @@ fun ServersScreen(manager: ServerManager, onOpen: (String) -> Unit, onCreate: ()
     val running = servers.count { states[it.id]?.state == RunState.RUNNING }
     val players = servers.sumOf { states[it.id]?.playersOnline ?: 0 }
 
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < 40 } }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize(), state = listState,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 188.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -74,7 +79,7 @@ fun ServersScreen(manager: ServerManager, onOpen: (String) -> Unit, onCreate: ()
             items(servers, key = { it.id }) { s ->
                 val idx = servers.indexOf(s)
                 ServerCard(
-                    s, states[s.id] ?: ServerRuntime(), address = ip?.let { "$it:${s.port}" }, modifier = Modifier.staggerIn(2 + idx),
+                    s, states[s.id] ?: ServerRuntime(), address = ip?.let { "$it:${s.port}" }, modifier = Modifier.animateItem().staggerIn(2 + idx),
                     onOpen = { onOpen(s.id) },
                     onCopy = { a -> clip.setText(AnnotatedString(a)); scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar("Copied $a") } },
                     onToggle = {
@@ -87,7 +92,7 @@ fun ServersScreen(manager: ServerManager, onOpen: (String) -> Unit, onCreate: ()
             }
         }
         ExtendedFloatingActionButton(
-            onClick = onCreate, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("New server") },
+            onClick = onCreate, expanded = fabExpanded, icon = { Icon(Icons.Rounded.Add, null) }, text = { Text("New server") },
             modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 16.dp, bottom = 92.dp),
         )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 92.dp))
@@ -149,16 +154,23 @@ private fun ServerCard(
     }
     GlassCard(modifier.fillMaxWidth().animateContentSize(), shape = MaterialTheme.shapes.extraLarge, tint = if (active) tint else null, onClick = onOpen) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            TypeAvatar(s.type, 60.dp, Modifier.sharedAvatar(s.id))
+            StateAura(r.state, Modifier.size(60.dp)) { TypeAvatar(s.type, 60.dp, Modifier.sharedAvatar(s.id)) }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(s.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 Text("${s.type.label} ${s.displayVersion} · ${s.ramMb.humanMb()}", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
+            val corner by animateDpAsState(if (active) 18.dp else 27.dp, spring(0.55f, 420f), label = "corner")
+            val btnBg by animateColorAsState(if (active) cs.errorContainer else cs.primary, tween(300), label = "btnBg")
+            val btnFg by animateColorAsState(if (active) cs.onErrorContainer else cs.onPrimary, tween(300), label = "btnFg")
             FilledIconButton(
-                onClick = onToggle, modifier = Modifier.size(54.dp), shape = if (active) MaterialTheme.shapes.medium else CircleShape,
-                colors = if (active) IconButtonDefaults.filledIconButtonColors(containerColor = cs.errorContainer, contentColor = cs.onErrorContainer) else IconButtonDefaults.filledIconButtonColors(),
-            ) { Icon(if (active) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (active) "Stop ${s.name}" else "Start ${s.name}", Modifier.size(28.dp)) }
+                onClick = onToggle, modifier = Modifier.size(54.dp), shape = androidx.compose.foundation.shape.RoundedCornerShape(corner),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = btnBg, contentColor = btnFg),
+            ) {
+                AnimatedContent(active, label = "icon", transitionSpec = { (scaleIn(spring(0.5f, 500f)) + fadeIn()) togetherWith (scaleOut() + fadeOut(tween(100))) }) { a ->
+                    Icon(if (a) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, if (a) "Stop ${s.name}" else "Start ${s.name}", Modifier.size(28.dp))
+                }
+            }
         }
         Spacer(Modifier.height(12.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {

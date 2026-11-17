@@ -40,7 +40,7 @@ private val imageCache = LruCache<String, ImageBitmap>(60)
 
 /** Tiny remote image loader (plugin icons). Falls back to a placeholder while loading or on failure. */
 @Composable
-private fun RemoteIcon(url: String?, size: androidx.compose.ui.unit.Dp = 52.dp) {
+fun PluginIcon(url: String?, size: androidx.compose.ui.unit.Dp = 52.dp) {
     val bmp by produceState<ImageBitmap?>(url?.let { imageCache[it] }, url) {
         if (url == null || value != null) return@produceState
         value = runCatching {
@@ -72,6 +72,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
     val tracked = remember(refresh) { store.installedProjectIds() }
     val working = remember { mutableStateMapOf<String, String>() }   // projectId -> status text
     var changed by remember { mutableStateOf(false) }
+    var detail by remember { mutableStateOf<MrProject?>(null) }
 
     Column(Modifier.fillMaxSize()) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -91,6 +92,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
                 Button({ mode = 1 }) { Icon(Icons.Rounded.Search, null); Spacer(Modifier.width(8.dp)); Text("Browse Modrinth") }
             } else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(installed, key = { it.file.name }) { p -> InstalledRow(p,
+                    onOpen = p.projectId?.let { pid -> { detail = MrProject(pid, "", p.name, "", "", 0, null) } },
                     onToggle = { store.setEnabled(p, it); changed = true; refresh++ },
                     onDelete = { store.remove(p); changed = true; refresh++; notify("Removed ${p.name}") }) }
             }
@@ -124,7 +126,7 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
                     results.isEmpty() -> Text("Nothing found for this Minecraft version. Try a different search.", Modifier.padding(20.dp), style = MaterialTheme.typography.bodyMedium)
                     else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 132.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(results, key = { it.id }) { p ->
-                            ResultCard(p, installed = p.id in tracked, status = working[p.id]) {
+                            ResultCard(p, installed = p.id in tracked, status = working[p.id], onOpen = { detail = p }) {
                                 scope.launch {
                                     working[p.id] = "Starting"
                                     runCatching { store.install(p.id, p.title, cfg.version, loaders, status = { working[p.id] = it }) }
@@ -139,17 +141,20 @@ fun PluginsTab(manager: ServerManager, cfg: ServerConfig, active: Boolean, notif
             }
         }
     }
+    detail?.let { p ->
+        PluginDetailSheet(p, cfg, store, loaders, onDismiss = { detail = null }, onChanged = { msg -> changed = true; refresh++; notify(msg) })
+    }
 }
 
 @Composable
-private fun InstalledRow(p: InstalledPlugin, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+private fun InstalledRow(p: InstalledPlugin, onOpen: (() -> Unit)?, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
-    com.lapisserve.app.ui.glass.GlassCard(shape = MaterialTheme.shapes.large, padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+    com.lapisserve.app.ui.glass.GlassCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onOpen, padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Rounded.Extension, null, tint = if (p.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
             Column(Modifier.weight(1f)) {
                 Text(p.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (p.enabled) p.file.name else "Disabled", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (!p.enabled) "Disabled" else if (onOpen != null) "Tap for versions · ${p.file.name}" else p.file.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Switch(p.enabled, onToggle)
             IconButton({ confirm = true }) { Icon(Icons.Rounded.Delete, "Remove ${p.name}") }
@@ -164,10 +169,10 @@ private fun InstalledRow(p: InstalledPlugin, onToggle: (Boolean) -> Unit, onDele
 }
 
 @Composable
-private fun ResultCard(p: MrProject, installed: Boolean, status: String?, onInstall: () -> Unit) {
-    com.lapisserve.app.ui.glass.GlassCard(shape = MaterialTheme.shapes.large, padding = PaddingValues(14.dp)) {
+private fun ResultCard(p: MrProject, installed: Boolean, status: String?, onOpen: () -> Unit, onInstall: () -> Unit) {
+    com.lapisserve.app.ui.glass.GlassCard(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large, onClick = onOpen, padding = PaddingValues(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
-            RemoteIcon(p.iconUrl)
+            PluginIcon(p.iconUrl)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(p.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("by ${p.author} · ${compact(p.downloads)} downloads", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -177,8 +182,11 @@ private fun ResultCard(p: MrProject, installed: Boolean, status: String?, onInst
                     status != null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Text(status, style = MaterialTheme.typography.labelMedium)
                     }
-                    installed -> AssistChip({}, { Text("Installed") }, enabled = false, leadingIcon = { Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) })
-                    else -> FilledTonalButton(onInstall, contentPadding = PaddingValues(horizontal = 16.dp)) { Icon(Icons.Rounded.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Install") }
+                    installed -> AssistChip(onOpen, { Text("Installed · versions") }, leadingIcon = { Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) })
+                    else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        FilledTonalButton(onInstall, contentPadding = PaddingValues(horizontal = 16.dp)) { Icon(Icons.Rounded.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Latest") }
+                        OutlinedButton(onOpen, contentPadding = PaddingValues(horizontal = 14.dp)) { Text("Versions") }
+                    }
                 }
             }
         }
